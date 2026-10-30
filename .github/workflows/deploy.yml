@@ -1,0 +1,56 @@
+name: Deploy produção
+
+# Every merge (or push) to main ships to production on Vercel.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One production deploy at a time; a newer merge waits for the current one.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_CLI: vercel@65.2.0
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck e lint
+        run: npm run typecheck && npm run lint
+
+      - name: Baixar configuração do projeto
+        run: npx --yes $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: npx --yes $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          out=$(npx --yes $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "$out"
+          # The CLI prints plain text or JSON depending on the terminal; grab the deployment URL either way.
+          url=$(echo "$out" | grep -oE 'https://[a-z0-9.-]+\.vercel\.app' | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deploy em produção: $url" >> "$GITHUB_STEP_SUMMARY"
