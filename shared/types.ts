@@ -1,10 +1,7 @@
 export type ColumnId = "good" | "improve" | "bad"
 
-export const COLUMNS: { id: ColumnId; title: string }[] = [
-  { id: "good", title: "O que foi bom" },
-  { id: "improve", title: "O que precisa melhorar" },
-  { id: "bad", title: "O que foi péssimo" },
-]
+/** Column order on the board. Titles are translated on the client. */
+export const COLUMNS: ColumnId[] = ["good", "improve", "bad"]
 
 /** Server errors travel as codes so each client shows them in its own language. */
 export type ErrorCode =

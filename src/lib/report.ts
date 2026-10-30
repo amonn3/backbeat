@@ -42,14 +42,14 @@ export function buildReport(board: Board, t: Dict) {
   out.push("")
 
   out.push(`## ${r.summary}`, "", `| ${r.column} | ${r.cards} | ${r.items} |`, "| --- | ---: | ---: |")
-  for (const { id } of COLUMNS) {
+  for (const id of COLUMNS) {
     const cards = board.cards.filter((c) => c.column === id)
     const items = cards.reduce((n, c) => n + c.items.length, 0)
     out.push(`| ${t.columns[id]} | ${cards.length} | ${items} |`)
   }
   out.push("")
 
-  for (const { id } of COLUMNS) {
+  for (const id of COLUMNS) {
     // Bigger groups first: they are the topics the team agreed on the most.
     const cards = board.cards
       .filter((c) => c.column === id)

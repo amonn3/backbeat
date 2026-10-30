@@ -238,7 +238,7 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(socket, (board, me) => {
         const clean = String(text ?? "").trim().slice(0, MAX_CARD_TEXT)
         if (!clean) return fail("card_title_required")
-        if (!COLUMNS.some((c) => c.id === column)) return fail("invalid_column")
+        if (!COLUMNS.includes(column)) return fail("invalid_column")
         const now = Date.now()
         board.cards.push({
           id: nanoid(10),

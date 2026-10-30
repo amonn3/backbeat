@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useI18n } from "@/i18n"
 import { COLUMN_STYLES } from "@/lib/columns"
 import { cn } from "@/lib/utils"
 
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: Props) {
+  const { t } = useI18n()
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
@@ -67,8 +69,8 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label={`Limpar coluna ${title}`}
-            title="Limpar coluna"
+            aria-label={t.column.clearAria(title)}
+            title={t.column.clear}
             disabled={cards.length === 0}
             onClick={() => setConfirmClear(true)}
           >
@@ -79,8 +81,8 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
           <Button
             size="icon-sm"
             variant="secondary"
-            aria-label={`Adicionar card em ${title}`}
-            title="Adicionar card"
+            aria-label={t.column.addAria(title)}
+            title={t.column.add}
             onClick={() => setComposing(true)}
           >
             <Plus />
@@ -98,11 +100,11 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Escreva o título do card…"
+              placeholder={t.column.placeholder}
               className="w-full resize-none bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted-foreground"
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="pl-1.5 text-[11px] text-muted-foreground">Enter salva · Shift+Enter quebra linha</span>
+              <span className="pl-1.5 text-[11px] text-muted-foreground">{t.column.hint}</span>
               <div className="flex gap-1">
                 <Button
                   size="xs"
@@ -112,10 +114,10 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
                     setText("")
                   }}
                 >
-                  Cancelar
+                  {t.column.cancel}
                 </Button>
                 <Button size="xs" disabled={!text.trim()} onClick={submit}>
-                  Adicionar
+                  {t.column.submit}
                 </Button>
               </div>
             </div>
@@ -141,7 +143,7 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
             onClick={() => setComposing(true)}
             className="grid flex-1 place-items-center rounded-2xl border border-dashed text-xs text-muted-foreground transition enabled:hover:border-primary/40 enabled:hover:text-foreground"
           >
-            {locked ? "Nenhum card" : "Clique no + para adicionar um card"}
+            {locked ? t.column.empty : t.column.emptyCta}
           </button>
         )}
       </div>
@@ -149,21 +151,18 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
       <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Limpar “{title}”?</DialogTitle>
-            <DialogDescription>
-              Os {cards.length} card(s) desta coluna serão removidos para todos os participantes. Não dá para
-              desfazer.
-            </DialogDescription>
+            <DialogTitle>{t.column.clearTitle(title)}</DialogTitle>
+            <DialogDescription>{t.column.clearDescription(cards.length)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+            <DialogClose render={<Button variant="outline" />}>{t.column.cancel}</DialogClose>
             <Button
               variant="destructive"
               onClick={async () => {
                 if (await actions.clearColumn(id)) setConfirmClear(false)
               }}
             >
-              Limpar coluna
+              {t.column.clear}
             </Button>
           </DialogFooter>
         </DialogContent>
