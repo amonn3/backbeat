@@ -1,0 +1,165 @@
+import { useState, type FormEvent } from "react"
+import { useNavigate } from "react-router-dom"
+import { ArrowRight, Columns3, Music2, Timer } from "lucide-react"
+import { toast } from "sonner"
+import type { CreateBoardRequest } from "@shared/types"
+import { Logo } from "@/components/Logo"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
+import { getParticipantId, getSavedName, markJoined, saveName } from "@/lib/identity"
+
+const FEATURES = [
+  { icon: Columns3, text: "3 colunas prontas para a retro" },
+  { icon: Music2, text: "Playlist do YouTube compartilhada" },
+  { icon: Timer, text: "Cronômetro sincronizado" },
+]
+
+export default function HomePage() {
+  const navigate = useNavigate()
+  const [name, setName] = useState(getSavedName)
+  const [title, setTitle] = useState("")
+  const [playlistOpen, setPlaylistOpen] = useState(true)
+  const [joinCode, setJoinCode] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const nameValid = name.trim().length > 0
+
+  async function createBoard(e: FormEvent) {
+    e.preventDefault()
+    if (!nameValid) return
+    setLoading(true)
+    try {
+      const body: CreateBoardRequest = {
+        title,
+        hostName: name.trim(),
+        hostId: getParticipantId(),
+        playlistOpen,
+      }
+      const res = await fetch("/api/boards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Não foi possível criar o board.")
+      saveName(name)
+      markJoined(data.id)
+      navigate(`/b/${data.id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível criar o board.")
+      setLoading(false)
+    }
+  }
+
+  function joinBoard(e: FormEvent) {
+    e.preventDefault()
+    const code = joinCode.trim().split("/b/").pop()?.split(/[?#/]/)[0]
+    if (code) navigate(`/b/${code}`)
+  }
+
+  return (
+    <main className="mx-auto flex min-h-svh max-w-5xl flex-col px-4 py-8 sm:px-6">
+      <Logo className="text-lg" />
+
+      <div className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[1.1fr_1fr]">
+        <section className="space-y-6">
+          <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+            Retrospectivas em tempo real
+          </span>
+          <h1 className="text-4xl leading-tight font-semibold tracking-tight text-balance sm:text-5xl">
+            Sua retro com <span className="text-primary">trilha sonora</span>.
+          </h1>
+          <p className="max-w-md text-base text-muted-foreground text-pretty">
+            Crie um board, compartilhe o link e deixe o time escrever o que foi bom, o que precisa melhorar e o
+            que foi péssimo com música rolando.
+          </p>
+          <ul className="space-y-2.5">
+            {FEATURES.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="grid size-7 place-items-center rounded-md bg-secondary text-foreground">
+                  <Icon className="size-3.5" />
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <Card className="bg-card/80 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-lg">Criar um novo board</CardTitle>
+            <CardDescription>Você será o host desta retro.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={createBoard} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="name">Seu nome</Label>
+                <Input
+                  id="name"
+                  autoFocus
+                  maxLength={40}
+                  placeholder="Como o time te chama?"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="title">
+                  Nome da retro <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="title"
+                  maxLength={80}
+                  placeholder="Ex.: Sprint 42 · Squad Pagamentos"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border bg-secondary/40 p-3">
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">Todos podem mexer na playlist</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Desligado: só você adiciona, remove e troca músicas.
+                  </span>
+                </span>
+                <Switch checked={playlistOpen} onCheckedChange={setPlaylistOpen} className="mt-0.5" />
+              </label>
+              <Button type="submit" size="lg" className="h-10 w-full" disabled={!nameValid || loading}>
+                {loading ? "Criando…" : "Criar board"}
+                <ArrowRight data-icon="inline-end" />
+              </Button>
+              {!nameValid && (
+                <p className="text-center text-xs text-muted-foreground">Preencha seu nome para continuar.</p>
+              )}
+            </form>
+
+            <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+              <Separator className="flex-1" />
+              ou entre em um board
+              <Separator className="flex-1" />
+            </div>
+
+            <form onSubmit={joinBoard} className="flex gap-2">
+              <Input
+                placeholder="Cole o link ou o código"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                className="h-9"
+              />
+              <Button type="submit" variant="secondary" className="h-9" disabled={!joinCode.trim()}>
+                Entrar
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  )
+}

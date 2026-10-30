@@ -1,0 +1,17 @@
+import { cn } from "@/lib/utils"
+
+export function Logo({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
+      <span className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_24px] shadow-primary/40">
+        <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
+          <rect x="3" y="9" width="3" height="6" rx="1.5" />
+          <rect x="8" y="5" width="3" height="14" rx="1.5" />
+          <rect x="13" y="2" width="3" height="20" rx="1.5" />
+          <rect x="18" y="7" width="3" height="10" rx="1.5" />
+        </svg>
+      </span>
+      Backbeat
+    </div>
+  )
+}
