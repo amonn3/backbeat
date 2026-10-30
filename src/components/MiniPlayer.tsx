@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Lock, Music2, Plus, SkipBack, SkipForward, Trash2 } from "lucide-react"
 import { canManagePlaylist, isPlaceholderTitle, parseYouTubeId, type Board, type Track } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
+import { useI18n } from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function MiniPlayer({ board, me, actions }: Props) {
+  const { t } = useI18n()
   const hostRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YTPlayer | null>(null)
   const loadedRef = useRef<string | null>(null)
@@ -30,6 +32,7 @@ export function MiniPlayer({ board, me, actions }: Props) {
   const isHost = board.hostId === me
   const current = board.playlist[board.currentTrack]
   const videoId = current?.videoId ?? null
+  const trackLabel = (track: Track) => (isPlaceholderTitle(track.title) ? t.player.untitled : track.title)
 
   useEffect(() => {
     indexRef.current = board.currentTrack
@@ -105,7 +108,7 @@ export function MiniPlayer({ board, me, actions }: Props) {
           <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/25 via-background to-background text-center">
             <div className="space-y-1 px-4">
               <Music2 className="mx-auto size-6 text-primary" />
-              <p className="text-xs text-muted-foreground">Adicione um link do YouTube para começar a trilha.</p>
+              <p className="text-xs text-muted-foreground">{t.player.empty}</p>
             </div>
           </div>
         )}
@@ -114,14 +117,14 @@ export function MiniPlayer({ board, me, actions }: Props) {
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Tocando agora</p>
-            <p className="truncate text-sm font-medium">{current?.title ?? "Nada na fila"}</p>
+            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{t.player.nowPlaying}</p>
+            <p className="truncate text-sm font-medium">{current ? trackLabel(current) : t.player.nothingQueued}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Música anterior"
+              aria-label={t.player.previous}
               disabled={!canManage || board.currentTrack <= 0}
               onClick={() => actions.playTrack(board.currentTrack - 1)}
             >
@@ -130,7 +133,7 @@ export function MiniPlayer({ board, me, actions }: Props) {
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Próxima música"
+              aria-label={t.player.next}
               disabled={!canManage || board.currentTrack >= board.playlist.length - 1}
               onClick={() => actions.playTrack(board.currentTrack + 1)}
             >
@@ -141,7 +144,7 @@ export function MiniPlayer({ board, me, actions }: Props) {
 
         <ScrollArea className="h-24 rounded-lg border bg-background/40">
           {board.playlist.length === 0 ? (
-            <p className="p-3 text-xs text-muted-foreground">A fila está vazia.</p>
+            <p className="p-3 text-xs text-muted-foreground">{t.player.queueEmpty}</p>
           ) : (
             <ol className="p-1">
               {board.playlist.map((track, i) => (
@@ -161,13 +164,13 @@ export function MiniPlayer({ board, me, actions }: Props) {
                     <span className="w-4 shrink-0 text-right tabular-nums opacity-60">
                       {i === board.currentTrack ? "▶" : i + 1}
                     </span>
-                    <span className="truncate">{track.title}</span>
+                    <span className="truncate">{trackLabel(track)}</span>
                     <span className="ml-auto shrink-0 opacity-60">{track.addedBy}</span>
                   </button>
                   {canManage && (
                     <button
                       type="button"
-                      aria-label={`Remover ${track.title}`}
+                      aria-label={t.player.remove(trackLabel(track))}
                       onClick={() => actions.removeTrack(track.id)}
                       className="shrink-0 opacity-0 transition group-hover:opacity-70 hover:text-destructive hover:opacity-100 focus-visible:opacity-100"
                     >
@@ -183,24 +186,24 @@ export function MiniPlayer({ board, me, actions }: Props) {
         {canManage ? (
           <form onSubmit={addTrack} className="flex gap-2">
             <Input
-              placeholder="Cole um link do YouTube"
+              placeholder={t.player.urlPlaceholder}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               aria-invalid={url.length > 0 && !urlValid}
             />
-            <Button type="submit" size="icon" disabled={!urlValid || adding} aria-label="Adicionar música">
+            <Button type="submit" size="icon" disabled={!urlValid || adding} aria-label={t.player.add}>
               <Plus />
             </Button>
           </form>
         ) : (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Lock className="size-3" /> Só o host controla a playlist desta retro.
+            <Lock className="size-3" /> {t.player.hostOnly}
           </p>
         )}
 
         {isHost && (
           <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-muted-foreground">
-            Todos podem mexer na playlist
+            {t.player.openToAll}
             <Switch
               size="sm"
               checked={board.settings.playlistOpen}
