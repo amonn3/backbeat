@@ -7,6 +7,11 @@ export interface RedisClient {
   get(key: string): Promise<string | null>
   set(key: string, value: string, opts: { EX: number }): Promise<unknown>
   eval(script: string, opts: { keys: string[]; arguments: string[] }): Promise<unknown>
+  zAdd(key: string, member: { score: number; value: string }): Promise<unknown>
+  zRem(key: string, member: string): Promise<unknown>
+  zRemRangeByScore(key: string, min: number | string, max: number | string): Promise<unknown>
+  zRange(key: string, start: number, stop: number): Promise<string[]>
+  expire(key: string, seconds: number): Promise<unknown>
 }
 
 /**
@@ -19,10 +24,18 @@ export interface Store {
   get(id: string): Promise<Board | undefined>
   create(board: Board): Promise<void>
   mutate<T>(id: string, fn: Mutation<T>): Promise<{ board: Board; result: T } | undefined>
+  /** Marks a connection as alive; it counts as online until PRESENCE_TTL_MS passes without a touch. */
+  touchPresence(boardId: string, socketId: string, participantId: string): Promise<void>
+  removePresence(boardId: string, socketId: string, participantId: string): Promise<void>
+  onlineParticipants(boardId: string): Promise<Set<string>>
 }
 
 const BOARD_TTL_SEC = 60 * 60 * 24 * 30
+export const PRESENCE_TTL_MS = 70_000
 const key = (id: string) => `backbeat:board:${id}`
+const presenceKey = (id: string) => `backbeat:presence:${id}`
+const presenceMember = (socketId: string, participantId: string) => `${participantId}|${socketId}`
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // Writes only if the stored JSON is still the one we read (compare-and-set).
 const CAS_SCRIPT = `
@@ -43,7 +56,9 @@ export function redisStore(client: RedisClient): Store {
       await client.set(key(board.id), JSON.stringify(board), { EX: BOARD_TTL_SEC })
     },
     async mutate(id, fn) {
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        // Jittered backoff spreads out writers that keep colliding.
+        if (attempt > 0) await sleep(Math.random() * Math.min(20 * attempt, 200))
         const raw = await client.get(key(id))
         if (!raw) return undefined
         const board = JSON.parse(raw) as Board
@@ -57,6 +72,21 @@ export function redisStore(client: RedisClient): Store {
       }
       throw new Error("Muitas alterações simultâneas, tente de novo.")
     },
+    async touchPresence(boardId, socketId, participantId) {
+      await client.zAdd(presenceKey(boardId), {
+        score: Date.now() + PRESENCE_TTL_MS,
+        value: presenceMember(socketId, participantId),
+      })
+      await client.expire(presenceKey(boardId), Math.ceil(PRESENCE_TTL_MS / 1000) * 2)
+    },
+    async removePresence(boardId, socketId, participantId) {
+      await client.zRem(presenceKey(boardId), presenceMember(socketId, participantId))
+    },
+    async onlineParticipants(boardId) {
+      await client.zRemRangeByScore(presenceKey(boardId), "-inf", Date.now())
+      const members = await client.zRange(presenceKey(boardId), 0, -1)
+      return new Set(members.map((m) => m.split("|")[0]))
+    },
   }
 }
 
@@ -65,6 +95,7 @@ export function fileStore(): Store {
   const dataDir = path.resolve(import.meta.dirname, "../data")
   const dataFile = path.join(dataDir, "boards.json")
   const boards = new Map<string, Board>()
+  const presence = new Map<string, Map<string, { participantId: string; expiresAt: number }>>()
   let saveTimer: NodeJS.Timeout | null = null
 
   if (existsSync(dataFile)) {
@@ -100,6 +131,22 @@ export function fileStore(): Store {
       const { commit, result } = fn(board)
       if (commit) scheduleSave()
       return { board, result }
+    },
+    async touchPresence(boardId, socketId, participantId) {
+      if (!presence.has(boardId)) presence.set(boardId, new Map())
+      presence.get(boardId)!.set(socketId, { participantId, expiresAt: Date.now() + PRESENCE_TTL_MS })
+    },
+    async removePresence(boardId, socketId) {
+      presence.get(boardId)?.delete(socketId)
+    },
+    async onlineParticipants(boardId) {
+      const now = Date.now()
+      const online = new Set<string>()
+      for (const [socketId, entry] of presence.get(boardId) ?? []) {
+        if (entry.expiresAt > now) online.add(entry.participantId)
+        else presence.get(boardId)!.delete(socketId)
+      }
+      return online
     },
   }
 }

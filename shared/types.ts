@@ -91,6 +91,8 @@ export interface ClientToServerEvents {
   "track:remove": (payload: { trackId: string }, ack: (res: Ack) => void) => void
   "track:play": (payload: { index: number }, ack: (res: Ack) => void) => void
   "track:ended": (payload: { index: number }) => void
+  "presence:ping": () => void
+  "track:title": (payload: { trackId: string; title: string }) => void
   "timer:start": (payload: { durationSec: number }, ack: (res: Ack) => void) => void
   "timer:pause": (ack: (res: Ack) => void) => void
   "timer:resume": (ack: (res: Ack) => void) => void
@@ -106,6 +108,13 @@ export interface ServerToClientEvents {
 
 export function canManagePlaylist(board: Board, participantId: string) {
   return board.hostId === participantId || board.settings.playlistOpen
+}
+
+export const PLACEHOLDER_TITLE = "Vídeo do YouTube"
+
+/** True for titles we could not resolve server-side (placeholder or a bare URL). */
+export function isPlaceholderTitle(title: string) {
+  return title === PLACEHOLDER_TITLE || /^https?:\/\//i.test(title.trim())
 }
 
 export function parseYouTubeId(input: string): string | null {

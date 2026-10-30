@@ -8,7 +8,9 @@ import { createClient } from "redis"
 import { Server, type Socket } from "socket.io"
 import {
   COLUMNS,
+  PLACEHOLDER_TITLE,
   canManagePlaylist,
+  isPlaceholderTitle,
   parseYouTubeId,
   type Ack,
   type Board,
@@ -60,10 +62,13 @@ const OK: Ack = { ok: true }
 const fail = (error: string): Ack => ({ ok: false, error })
 const isHost = (board: Board, id: string) => board.hostId === id
 
-/** Presence is derived from live sockets across all instances, never persisted. */
+/**
+ * Presence lives in the store, refreshed by client pings. Asking the other
+ * instances (fetchSockets) is unreliable on Vercel: suspended instances keep
+ * their Redis subscription but never answer, so every call would time out.
+ */
 async function withPresence(board: Board) {
-  const sockets = await io.in(board.id).fetchSockets()
-  const online = new Set(sockets.map((s) => s.data.participantId))
+  const online = await store.onlineParticipants(board.id)
   for (const p of Object.values(board.participants)) p.online = online.has(p.id)
   return { board, serverTime: Date.now() }
 }
@@ -129,8 +134,9 @@ async function fetchTitle(videoId: string) {
   ]
   for (const source of sources) {
     try {
+      // From datacenter IPs YouTube sometimes answers with the URL or a generic name.
       const title = (await source())?.trim()
-      if (title) return title.slice(0, 200)
+      if (title && !isPlaceholderTitle(title) && title !== "YouTube") return title.slice(0, 200)
     } catch {
       // Try the next source.
     }
@@ -201,6 +207,7 @@ io.on("connection", (socket: AppSocket) => {
       if (!res) return ack({ ok: false, error: "Board não encontrado." })
       socket.data = { boardId, participantId }
       await socket.join(boardId)
+      await store.touchPresence(boardId, socket.id, participantId)
       ack({ ok: true, snapshot: await withPresence(res.board) })
       await broadcast(res.board)
     } catch (err) {
@@ -209,9 +216,21 @@ io.on("connection", (socket: AppSocket) => {
     }
   })
 
+  socket.on("presence:ping", async () => {
+    const { boardId, participantId } = socket.data
+    if (boardId && participantId) await store.touchPresence(boardId, socket.id, participantId).catch(() => {})
+  })
+
   socket.on("disconnect", async () => {
-    const board = socket.data.boardId ? await store.get(socket.data.boardId) : undefined
-    if (board) await broadcast(board)
+    const { boardId, participantId } = socket.data
+    if (!boardId || !participantId) return
+    try {
+      await store.removePresence(boardId, socket.id, participantId)
+      const board = await store.get(boardId)
+      if (board) await broadcast(board)
+    } catch (err) {
+      console.error("[disconnect]", err)
+    }
   })
 
   socket.on("card:add", async ({ column, text }, ack) =>
@@ -306,7 +325,7 @@ io.on("connection", (socket: AppSocket) => {
     if (pre && socket.data.participantId && !canManagePlaylist(pre, socket.data.participantId)) {
       return ack(fail("Só o host pode mexer na playlist desta retro."))
     }
-    const title = (await fetchTitle(videoId)) ?? "Vídeo do YouTube"
+    const title = (await fetchTitle(videoId)) ?? PLACEHOLDER_TITLE
     ack(
       await withBoard(
         socket,
@@ -322,6 +341,23 @@ io.on("connection", (socket: AppSocket) => {
         },
         { allowWhenFinished: true },
       ),
+    )
+  })
+
+  // The player in the browser always knows the real title; it fills in tracks
+  // the server could not name. Only placeholders can be renamed.
+  socket.on("track:title", async ({ trackId, title }) => {
+    const clean = String(title ?? "").trim().slice(0, 200)
+    if (!clean || isPlaceholderTitle(clean)) return
+    await withBoard(
+      socket,
+      (board) => {
+        const track = board.playlist.find((t) => t.id === trackId)
+        if (!track || !isPlaceholderTitle(track.title)) return fail("noop")
+        track.title = clean
+        return OK
+      },
+      { allowWhenFinished: true },
     )
   })
 

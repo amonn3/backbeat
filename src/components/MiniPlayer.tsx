@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Lock, Music2, Plus, SkipBack, SkipForward, Trash2 } from "lucide-react"
-import { canManagePlaylist, parseYouTubeId, type Board } from "@shared/types"
+import { canManagePlaylist, isPlaceholderTitle, parseYouTubeId, type Board, type Track } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ export function MiniPlayer({ board, me, actions }: Props) {
   const loadedRef = useRef<string | null>(null)
   const firstSyncRef = useRef(true)
   const indexRef = useRef(board.currentTrack)
+  const trackRef = useRef<Track | undefined>(undefined)
   const [ready, setReady] = useState(false)
   const [url, setUrl] = useState("")
   const [adding, setAdding] = useState(false)
@@ -32,7 +33,8 @@ export function MiniPlayer({ board, me, actions }: Props) {
 
   useEffect(() => {
     indexRef.current = board.currentTrack
-  }, [board.currentTrack])
+    trackRef.current = current
+  }, [board.currentTrack, current])
 
   // Create the player once; the API replaces the inner div with the iframe.
   useEffect(() => {
@@ -49,6 +51,13 @@ export function MiniPlayer({ board, me, actions }: Props) {
           onReady: () => setReady(true),
           onStateChange: (e) => {
             if (e.data === YT.PlayerState.ENDED) actions.trackEnded(indexRef.current)
+            const track = trackRef.current
+            if ((e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.CUED) && track) {
+              const data = playerRef.current?.getVideoData()
+              if (data?.title && data.video_id === track.videoId && isPlaceholderTitle(track.title)) {
+                actions.nameTrack(track.id, data.title)
+              }
+            }
           },
         },
       })

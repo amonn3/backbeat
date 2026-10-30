@@ -4,6 +4,7 @@ export interface YTPlayer {
   cueVideoById(id: string): void
   stopVideo(): void
   destroy(): void
+  getVideoData(): { title?: string; video_id?: string }
 }
 
 interface YTNamespace {
@@ -17,7 +18,7 @@ interface YTNamespace {
       events?: { onStateChange?: (e: { data: number }) => void; onReady?: () => void }
     },
   ) => YTPlayer
-  PlayerState: { ENDED: number }
+  PlayerState: { ENDED: number; PLAYING: number; CUED: number }
 }
 
 declare global {

@@ -44,6 +44,8 @@ export function useBoard(boardId: string, name: string | null) {
     }
 
     socket.on("connect", join)
+    // Keeps this tab counted as online; the server expires silent connections.
+    const ping = setInterval(() => socket.connected && socket.emit("presence:ping"), 25_000)
     socket.on("disconnect", () => setStatus("connecting"))
     socket.on("board:state", (snapshot) => {
       setBoard(snapshot.board)
@@ -51,6 +53,7 @@ export function useBoard(boardId: string, name: string | null) {
     })
 
     return () => {
+      clearInterval(ping)
       socket.disconnect()
       socketRef.current = null
     }
@@ -80,6 +83,7 @@ export function useBoard(boardId: string, name: string | null) {
       removeTrack: (trackId: string) => call((s, d) => s.emit("track:remove", { trackId }, d)),
       playTrack: (index: number) => call((s, d) => s.emit("track:play", { index }, d)),
       trackEnded: (index: number) => socketRef.current?.emit("track:ended", { index }),
+      nameTrack: (trackId: string, title: string) => socketRef.current?.emit("track:title", { trackId, title }),
       startTimer: (durationSec: number) => call((s, d) => s.emit("timer:start", { durationSec }, d)),
       pauseTimer: () => call((s, d) => s.emit("timer:pause", d)),
       resumeTimer: () => call((s, d) => s.emit("timer:resume", d)),
