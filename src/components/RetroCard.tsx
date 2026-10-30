@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable, useDndContext } from "@dnd-kit/core"
 import { Layers, Trash2, Ungroup } from "lucide-react"
 import type { Card, ColumnId } from "@shared/types"
+import { useI18n } from "@/i18n"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -19,13 +20,14 @@ export interface CardDragData {
 
 /** Body shared by the in-column card and the floating drag preview. */
 function CardBody({ card, canDelete, locked, onDelete, onSplit }: Omit<Props, "accent" | "overlay">) {
+  const { t } = useI18n()
   const grouped = card.items.length > 1
   return (
     <>
       {grouped && (
         <div className="mb-2 flex items-center justify-between">
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
-            <Layers className="size-3" /> {card.items.length} agrupados
+            <Layers className="size-3" /> {t.card.grouped(card.items.length)}
           </span>
         </div>
       )}
@@ -42,8 +44,8 @@ function CardBody({ card, canDelete, locked, onDelete, onSplit }: Omit<Props, "a
           {grouped && onSplit && (
             <button
               type="button"
-              aria-label="Desagrupar"
-              title="Desagrupar"
+              aria-label={t.card.split}
+              title={t.card.split}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={onSplit}
               className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -54,8 +56,8 @@ function CardBody({ card, canDelete, locked, onDelete, onSplit }: Omit<Props, "a
           {canDelete && onDelete && (
             <button
               type="button"
-              aria-label="Remover card"
-              title="Remover card"
+              aria-label={t.card.remove}
+              title={t.card.remove}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={onDelete}
               className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
@@ -75,6 +77,7 @@ const cardClass =
 export function RetroCard(props: Props) {
   const { card, locked, accent, overlay } = props
   const { active } = useDndContext()
+  const { t } = useI18n()
   const data: CardDragData = { column: card.column }
   const drag = useDraggable({ id: card.id, data, disabled: locked })
   const drop = useDroppable({ id: card.id, data, disabled: locked })
@@ -112,7 +115,7 @@ export function RetroCard(props: Props) {
       <CardBody {...props} />
       {isMergeTarget && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-2xl bg-primary/15 text-xs font-semibold text-primary backdrop-blur-[1px]">
-          Soltar para agrupar
+          {t.card.dropToMerge}
         </div>
       )}
     </div>
