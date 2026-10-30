@@ -6,6 +6,8 @@
 - English and Portuguese translations, with a language switcher on every screen. The default follows the
   browser language and the choice is remembered per browser.
 - The Markdown report is generated in the language of whoever downloads it.
+- Volume slider and mute button in the mini player. The YouTube embed hides its own volume slider at this
+  size; each person's volume is kept in their browser and never shared with the room.
 
 ### Changed
 - Timer presets are now 30s, 1 min, 3 min and 5 min.
