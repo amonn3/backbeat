@@ -55,7 +55,7 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
   return (
     <section
       className={cn(
-        "flex min-h-80 flex-col rounded-2xl border bg-gradient-to-b to-card/40 to-40% p-3",
+        "flex min-h-80 flex-col rounded-2xl border bg-gradient-to-b to-card/40 to-40% p-3 md:min-h-0",
         style.glow,
       )}
     >
@@ -90,40 +90,41 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
         )}
       </header>
 
-      <div className="flex flex-1 flex-col gap-2.5">
-        {composing && !locked && (
-          <div className={cn("rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
-            <textarea
-              autoFocus
-              rows={3}
-              maxLength={500}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder={t.column.placeholder}
-              className="w-full resize-none bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <div className="flex items-center justify-between gap-2">
-              <span className="pl-1.5 text-[11px] text-muted-foreground">{t.column.hint}</span>
-              <div className="flex gap-1">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => {
-                    setComposing(false)
-                    setText("")
-                  }}
-                >
-                  {t.column.cancel}
-                </Button>
-                <Button size="xs" disabled={!text.trim()} onClick={submit}>
-                  {t.column.submit}
-                </Button>
-              </div>
+      {composing && !locked && (
+        <div className={cn("mb-2.5 rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
+          <textarea
+            autoFocus
+            rows={3}
+            maxLength={500}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={t.column.placeholder}
+            className="w-full resize-none bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted-foreground"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="pl-1.5 text-[11px] text-muted-foreground">{t.column.hint}</span>
+            <div className="flex gap-1">
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => {
+                  setComposing(false)
+                  setText("")
+                }}
+              >
+                {t.column.cancel}
+              </Button>
+              <Button size="xs" disabled={!text.trim()} onClick={submit}>
+                {t.column.submit}
+              </Button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
+      {/* Only the card list scrolls, so a long column never stretches the page. */}
+      <div className="scroll-thin -mx-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-1 py-1">
         {cards.map((card) => (
           <RetroCard
             key={card.id}

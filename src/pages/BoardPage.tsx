@@ -140,7 +140,9 @@ export default function BoardPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-[1400px] flex-col gap-4 px-4 py-4 sm:px-6">
+    // On desktop the page is exactly one screen tall and each column scrolls on its own;
+    // on mobile the columns stack and the page scrolls as usual.
+    <div className="mx-auto flex min-h-svh max-w-[1400px] flex-col gap-4 px-4 py-4 sm:px-6 md:h-svh">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <Link to="/">
           <Logo />
@@ -215,7 +217,7 @@ export default function BoardPage() {
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragId(null)}
       >
-        <main className="grid flex-1 gap-4 md:grid-cols-3">
+        <main className="grid flex-1 gap-4 md:min-h-72 md:grid-cols-3">
           {COLUMNS.map((id) => (
             <RetroColumn
               key={id}
@@ -242,7 +244,7 @@ export default function BoardPage() {
         </DragOverlay>
       </DndContext>
 
-      <p className="pb-2 text-center text-xs text-muted-foreground">{t.board.dragTip}</p>
+      <p className="text-center text-xs text-muted-foreground">{t.board.dragTip}</p>
 
       <Dialog open={confirmFinish} onOpenChange={setConfirmFinish}>
         <DialogContent>
