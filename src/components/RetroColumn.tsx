@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils"
 interface Props {
   id: ColumnId
   title: string
-  emoji: string
   cards: Card[]
   me: string
   isHost: boolean
@@ -27,7 +26,7 @@ interface Props {
   actions: BoardActions
 }
 
-export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actions }: Props) {
+export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: Props) {
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
@@ -60,10 +59,7 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
     >
       <header className="mb-3 flex items-center gap-2 px-1">
         <span className={cn("size-2 rounded-full", style.dot)} />
-        <h2 className="flex-1 truncate text-sm font-semibold">
-          <span className="mr-1.5">{emoji}</span>
-          {title}
-        </h2>
+        <h2 className="flex-1 truncate text-sm font-semibold">{title}</h2>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground tabular-nums">
           {itemCount}
         </span>

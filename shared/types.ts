@@ -1,9 +1,9 @@
 export type ColumnId = "good" | "improve" | "bad"
 
-export const COLUMNS: { id: ColumnId; title: string; emoji: string }[] = [
-  { id: "good", title: "O que foi bom", emoji: "😄" },
-  { id: "improve", title: "O que precisa melhorar", emoji: "🤔" },
-  { id: "bad", title: "O que foi péssimo", emoji: "😩" },
+export const COLUMNS: { id: ColumnId; title: string }[] = [
+  { id: "good", title: "O que foi bom" },
+  { id: "improve", title: "O que precisa melhorar" },
+  { id: "bad", title: "O que foi péssimo" },
 ]
 
 /** Server errors travel as codes so each client shows them in its own language. */
