@@ -5,6 +5,9 @@ export interface YTPlayer {
   stopVideo(): void
   destroy(): void
   getVideoData(): { title?: string; video_id?: string }
+  setVolume(volume: number): void
+  mute(): void
+  unMute(): void
 }
 
 interface YTNamespace {
@@ -29,6 +32,27 @@ declare global {
 }
 
 let loading: Promise<YTNamespace> | null = null
+
+const VOLUME_KEY = "backbeat:volume"
+
+/** Each listener keeps their own volume; it is never shared with the room. */
+export function loadVolume(): { volume: number; muted: boolean } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(VOLUME_KEY) ?? "null")
+    if (typeof saved?.volume === "number") return { volume: saved.volume, muted: Boolean(saved.muted) }
+  } catch {
+    // Unreadable or blocked storage: use the default.
+  }
+  return { volume: 70, muted: false }
+}
+
+export function saveVolume(value: { volume: number; muted: boolean }) {
+  try {
+    localStorage.setItem(VOLUME_KEY, JSON.stringify(value))
+  } catch {
+    // Not persisted; the volume still applies to this tab.
+  }
+}
 
 export function loadYouTubeApi() {
   loading ??= new Promise((resolve) => {

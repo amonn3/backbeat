@@ -102,6 +102,9 @@ export const pt = {
     hostOnly: "Só o host controla a playlist desta retro.",
     openToAll: "Todos podem mexer na playlist",
     untitled: "Vídeo do YouTube",
+    volume: "Volume",
+    mute: "Silenciar",
+    unmute: "Ativar som",
   },
 
   timer: {

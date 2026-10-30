@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Lock, Music2, Plus, SkipBack, SkipForward, Trash2 } from "lucide-react"
+import { Lock, Music2, Plus, SkipBack, SkipForward, Trash2, Volume1, Volume2, VolumeX } from "lucide-react"
 import { canManagePlaylist, isPlaceholderTitle, parseYouTubeId, type Board, type Track } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
 import { useI18n } from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import { loadYouTubeApi, type YTPlayer } from "@/lib/youtube"
+import { loadVolume, loadYouTubeApi, saveVolume, type YTPlayer } from "@/lib/youtube"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -27,6 +28,8 @@ export function MiniPlayer({ board, me, actions }: Props) {
   const [ready, setReady] = useState(false)
   const [url, setUrl] = useState("")
   const [adding, setAdding] = useState(false)
+  // Our own volume control: the YouTube embed hides its slider at mini-player sizes.
+  const [audio, setAudio] = useState(loadVolume)
 
   const canManage = canManagePlaylist(board, me)
   const isHost = board.hostId === me
@@ -90,6 +93,27 @@ export function MiniPlayer({ board, me, actions }: Props) {
     loadedRef.current = `${board.currentTrack}:${videoId}`
   }, [ready, videoId, board.currentTrack])
 
+  useEffect(() => {
+    const player = playerRef.current
+    if (!ready || !player) return
+    player.setVolume(audio.volume)
+    if (audio.muted || audio.volume === 0) player.mute()
+    else player.unMute()
+    saveVolume(audio)
+  }, [ready, audio])
+
+  function changeVolume(value: number | readonly number[]) {
+    const volume = Array.isArray(value) ? value[0] : (value as number)
+    setAudio({ volume, muted: volume === 0 })
+  }
+
+  function toggleMute() {
+    setAudio((a) => (a.muted || a.volume === 0 ? { volume: a.volume || 50, muted: false } : { ...a, muted: true }))
+  }
+
+  const silent = audio.muted || audio.volume === 0
+  const VolumeIcon = silent ? VolumeX : audio.volume < 50 ? Volume1 : Volume2
+
   async function addTrack(e: FormEvent) {
     e.preventDefault()
     if (!parseYouTubeId(url)) return
@@ -121,6 +145,26 @@ export function MiniPlayer({ board, me, actions }: Props) {
             <p className="truncate text-sm font-medium">{current ? trackLabel(current) : t.player.nothingQueued}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={silent ? t.player.unmute : t.player.mute}
+              title={silent ? t.player.unmute : t.player.mute}
+              onClick={toggleMute}
+            >
+              <VolumeIcon />
+            </Button>
+            {/* The slider fills its parent, so the wrapper sets the width. */}
+            <div className="mr-2 w-20 sm:w-24">
+              <Slider
+                aria-label={t.player.volume}
+                min={0}
+                max={100}
+                step={1}
+                value={[silent ? 0 : audio.volume]}
+                onValueChange={changeVolume}
+              />
+            </div>
             <Button
               size="icon-sm"
               variant="ghost"

@@ -102,6 +102,9 @@ export const en: Dict = {
     hostOnly: "Only the host controls this retro's playlist.",
     openToAll: "Everyone can manage the playlist",
     untitled: "YouTube video",
+    volume: "Volume",
+    mute: "Mute",
+    unmute: "Unmute",
   },
 
   timer: {
