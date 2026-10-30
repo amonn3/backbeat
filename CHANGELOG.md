@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0
+## 0.2.0 — 2026-10-30
 
 ### Added
 - English and Portuguese translations, with a language switcher on every screen. The default follows the
