@@ -14,8 +14,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3101',
-      '/socket.io': { target: 'http://localhost:3101', ws: true },
+      '/api': { target: 'http://localhost:3101', ws: true },
     },
   },
 })

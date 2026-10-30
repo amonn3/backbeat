@@ -20,6 +20,21 @@ npm run build
 npm start          # http://localhost:3101  (PORT=xxxx para trocar)
 ```
 
+## Deploy na Vercel
+
+O app roda como site estático (Vite) + uma Vercel Function (`api/index.ts`) que atende a API REST e o
+Socket.IO via WebSocket. Como as instâncias não compartilham memória, em produção os boards ficam no
+**Redis** (Upstash, pela Marketplace), e o `@socket.io/redis-adapter` sincroniza as salas entre instâncias.
+
+- Sem `REDIS_URL`/`KV_URL`: estado em memória + `data/boards.json` (dev local).
+- Com Redis: cada alteração é gravada com compare-and-set, sem perder escritas concorrentes. Os boards
+  expiram após 30 dias sem alterações.
+- No plano Hobby a conexão WebSocket dura até 5 min; o cliente reconecta e volta para o board sozinho.
+
+```bash
+vercel deploy --prod
+```
+
 ## Funcionalidades
 
 - **Criação do board**: nome obrigatório (nomes vazios travam o fluxo), título opcional e permissão da
@@ -37,11 +52,12 @@ npm start          # http://localhost:3101  (PORT=xxxx para trocar)
 ## Stack
 
 - React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui (Base UI)
-- Express + Socket.IO (estado em memória, persistido em `data/boards.json`)
+- Express + Socket.IO (Redis em produção; memória + `data/boards.json` em dev)
 - @dnd-kit para o drag-and-drop
 
 ```
-server/   API REST (criação) + eventos Socket.IO (todo o resto)
+api/      entrada da Vercel Function
+server/   API REST (criação) + eventos Socket.IO (todo o resto) e store (Redis ou arquivo)
 shared/   tipos e regras compartilhadas entre front e servidor
 src/      front-end (pages/, components/, hooks/useBoard.ts, lib/report.ts)
 ```

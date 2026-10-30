@@ -26,7 +26,8 @@ export function useBoard(boardId: string, name: string | null) {
 
   useEffect(() => {
     if (!name) return
-    const socket: AppSocket = io({ transports: ["websocket", "polling"] })
+    // WebSocket only: Vercel Functions do not support Socket.IO long-polling.
+    const socket: AppSocket = io({ path: "/api/socket.io", transports: ["websocket"] })
     socketRef.current = socket
 
     const join = () => {
