@@ -24,3 +24,8 @@ yarn-debug.log*
 yarn-error.log*
 .vercel
 .env*
+
+# Agent skills installed locally by the Vercel/Upstash CLI
+.agents
+.claude
+skills-lock.json
