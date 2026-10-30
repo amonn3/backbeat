@@ -70,7 +70,7 @@ export function redisStore(client: RedisClient): Store {
         })
         if (written === 1) return { board, result }
       }
-      throw new Error("Muitas alterações simultâneas, tente de novo.")
+      throw new Error("too_many_changes")
     },
     async touchPresence(boardId, socketId, participantId) {
       await client.zAdd(presenceKey(boardId), {

@@ -15,6 +15,7 @@ import {
   type Ack,
   type Board,
   type ClientToServerEvents,
+  type ErrorCode,
   type CreateBoardRequest,
   type ServerToClientEvents,
 } from "../shared/types.js"
@@ -59,7 +60,7 @@ if (redisUrl) {
 }
 
 const OK: Ack = { ok: true }
-const fail = (error: string): Ack => ({ ok: false, error })
+const fail = (error: ErrorCode): Ack => ({ ok: false, error })
 const isHost = (board: Board, id: string) => board.hostId === id
 
 /**
@@ -88,21 +89,21 @@ async function withBoard(
   opts: { allowWhenFinished?: boolean } = {},
 ): Promise<Ack> {
   const { boardId, participantId } = socket.data
-  if (!boardId || !participantId) return fail("Você não está em um board.")
+  if (!boardId || !participantId) return fail("not_in_board")
   try {
     const res = await store.mutate(boardId, (board) => {
       if (board.finishedAt && !opts.allowWhenFinished) {
-        return { commit: false, result: fail("Esta retro já foi encerrada.") }
+        return { commit: false, result: fail("board_finished") }
       }
       const result = handler(board, participantId)
       return { commit: result.ok, result }
     })
-    if (!res) return fail("Board não encontrado.")
+    if (!res) return fail("board_not_found")
     if (res.result.ok) await broadcast(res.board)
     return res.result
   } catch (err) {
     console.error("[board]", err)
-    return fail(err instanceof Error ? err.message : "Erro inesperado.")
+    return fail(err instanceof Error && err.message === "too_many_changes" ? "too_many_changes" : "unexpected")
   }
 }
 
@@ -149,7 +150,7 @@ app.post("/api/boards", async (req, res) => {
   const hostName = String(body.hostName ?? "").trim().slice(0, MAX_NAME)
   const hostId = String(body.hostId ?? "").trim()
   if (!hostName || !hostId) {
-    res.status(400).json({ error: "Informe seu nome para criar o board." })
+    res.status(400).json({ error: "name_required" })
     return
   }
   const now = Date.now()
@@ -176,7 +177,7 @@ app.post("/api/boards", async (req, res) => {
 app.get("/api/boards/:id", async (req, res) => {
   const board = await store.get(req.params.id)
   if (!board) {
-    res.status(404).json({ error: "Board não encontrado." })
+    res.status(404).json({ error: "board_not_found" })
     return
   }
   res.json({ id: board.id, title: board.title })
@@ -192,7 +193,7 @@ if (!process.env.VERCEL && existsSync(dist)) {
 io.on("connection", (socket: AppSocket) => {
   socket.on("board:join", async ({ boardId, participantId, name }, ack) => {
     const cleanName = String(name ?? "").trim().slice(0, MAX_NAME)
-    if (!cleanName || !participantId) return ack({ ok: false, error: "Informe seu nome para entrar." })
+    if (!cleanName || !participantId) return ack({ ok: false, error: "name_required" })
     try {
       const res = await store.mutate(boardId, (board) => {
         const existing = board.participants[participantId]
@@ -204,7 +205,7 @@ io.on("connection", (socket: AppSocket) => {
         }
         return { commit: existing?.name !== cleanName, result: null }
       })
-      if (!res) return ack({ ok: false, error: "Board não encontrado." })
+      if (!res) return ack({ ok: false, error: "board_not_found" })
       socket.data = { boardId, participantId }
       await socket.join(boardId)
       await store.touchPresence(boardId, socket.id, participantId)
@@ -212,7 +213,7 @@ io.on("connection", (socket: AppSocket) => {
       await broadcast(res.board)
     } catch (err) {
       console.error("[join]", err)
-      ack({ ok: false, error: "Não foi possível entrar no board." })
+      ack({ ok: false, error: "join_failed" })
     }
   })
 
@@ -237,8 +238,8 @@ io.on("connection", (socket: AppSocket) => {
     ack(
       await withBoard(socket, (board, me) => {
         const clean = String(text ?? "").trim().slice(0, MAX_CARD_TEXT)
-        if (!clean) return fail("O card precisa de um título.")
-        if (!COLUMNS.some((c) => c.id === column)) return fail("Coluna inválida.")
+        if (!clean) return fail("card_title_required")
+        if (!COLUMNS.some((c) => c.id === column)) return fail("invalid_column")
         const now = Date.now()
         board.cards.push({
           id: nanoid(10),
@@ -249,7 +250,7 @@ io.on("connection", (socket: AppSocket) => {
               id: nanoid(10),
               text: clean,
               authorId: me,
-              authorName: board.participants[me]?.name ?? "Anônimo",
+              authorName: board.participants[me]?.name ?? "—",
               createdAt: now,
             },
           ],
@@ -263,9 +264,9 @@ io.on("connection", (socket: AppSocket) => {
     ack(
       await withBoard(socket, (board, me) => {
         const card = board.cards.find((c) => c.id === cardId)
-        if (!card) return fail("Card não encontrado.")
+        if (!card) return fail("card_not_found")
         const isAuthor = card.items.every((i) => i.authorId === me)
-        if (!isAuthor && !isHost(board, me)) return fail("Só o autor ou o host podem remover este card.")
+        if (!isAuthor && !isHost(board, me)) return fail("delete_forbidden")
         board.cards = board.cards.filter((c) => c.id !== cardId)
         return OK
       }),
@@ -275,11 +276,11 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("card:merge", async ({ sourceId, targetId }, ack) =>
     ack(
       await withBoard(socket, (board) => {
-        if (sourceId === targetId) return fail("Escolha outro card.")
+        if (sourceId === targetId) return fail("merge_same_card")
         const source = board.cards.find((c) => c.id === sourceId)
         const target = board.cards.find((c) => c.id === targetId)
-        if (!source || !target) return fail("Card não encontrado.")
-        if (source.column !== target.column) return fail("Só dá para agrupar cards da mesma coluna.")
+        if (!source || !target) return fail("card_not_found")
+        if (source.column !== target.column) return fail("merge_same_column")
         target.items.push(...source.items)
         board.cards = board.cards.filter((c) => c.id !== sourceId)
         return OK
@@ -292,7 +293,7 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(socket, (board) => {
         const index = board.cards.findIndex((c) => c.id === cardId)
         const card = board.cards[index]
-        if (!card || card.items.length < 2) return fail("Este card não está agrupado.")
+        if (!card || card.items.length < 2) return fail("not_grouped")
         const [first, ...rest] = card.items
         card.items = [first]
         const split = rest.map((item) => ({
@@ -310,7 +311,7 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("column:clear", async ({ column }, ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host pode limpar colunas.")
+        if (!isHost(board, me)) return fail("clear_host_only")
         board.cards = board.cards.filter((c) => c.column !== column)
         return OK
       }),
@@ -319,23 +320,23 @@ io.on("connection", (socket: AppSocket) => {
 
   socket.on("track:add", async ({ url }, ack) => {
     const videoId = parseYouTubeId(String(url ?? ""))
-    if (!videoId) return ack(fail("Link do YouTube inválido."))
+    if (!videoId) return ack(fail("invalid_youtube"))
     // Check permission before the network call, then again inside withBoard.
     const pre = socket.data.boardId ? await store.get(socket.data.boardId) : undefined
     if (pre && socket.data.participantId && !canManagePlaylist(pre, socket.data.participantId)) {
-      return ack(fail("Só o host pode mexer na playlist desta retro."))
+      return ack(fail("playlist_host_only"))
     }
     const title = (await fetchTitle(videoId)) ?? PLACEHOLDER_TITLE
     ack(
       await withBoard(
         socket,
         (board, me) => {
-          if (!canManagePlaylist(board, me)) return fail("Só o host pode mexer na playlist desta retro.")
+          if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
           board.playlist.push({
             id: nanoid(10),
             videoId,
             title,
-            addedBy: board.participants[me]?.name ?? "Anônimo",
+            addedBy: board.participants[me]?.name ?? "—",
           })
           return OK
         },
@@ -366,9 +367,9 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!canManagePlaylist(board, me)) return fail("Só o host pode mexer na playlist desta retro.")
+          if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
           const index = board.playlist.findIndex((t) => t.id === trackId)
-          if (index === -1) return fail("Música não encontrada.")
+          if (index === -1) return fail("track_not_found")
           board.playlist.splice(index, 1)
           if (index < board.currentTrack) board.currentTrack--
           board.currentTrack = Math.min(board.currentTrack, Math.max(board.playlist.length - 1, 0))
@@ -384,9 +385,9 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!canManagePlaylist(board, me)) return fail("Só o host pode mexer na playlist desta retro.")
+          if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
           if (!Number.isInteger(index) || index < 0 || index >= board.playlist.length) {
-            return fail("Música não encontrada.")
+            return fail("track_not_found")
           }
           board.currentTrack = index
           return OK
@@ -413,9 +414,9 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("timer:start", async ({ durationSec }, ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host controla o cronômetro.")
+        if (!isHost(board, me)) return fail("timer_host_only")
         const sec = Math.round(Number(durationSec))
-        if (!Number.isFinite(sec) || sec < 1 || sec > MAX_TIMER_SEC) return fail("Escolha entre 1s e 60min.")
+        if (!Number.isFinite(sec) || sec < 1 || sec > MAX_TIMER_SEC) return fail("timer_range")
         board.timer = { durationSec: sec, endsAt: Date.now() + sec * 1000, remainingMs: sec * 1000 }
         return OK
       }),
@@ -425,8 +426,8 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("timer:pause", async (ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host controla o cronômetro.")
-        if (!board.timer.endsAt) return fail("O cronômetro não está rodando.")
+        if (!isHost(board, me)) return fail("timer_host_only")
+        if (!board.timer.endsAt) return fail("timer_not_running")
         board.timer.remainingMs = Math.max(board.timer.endsAt - Date.now(), 0)
         board.timer.endsAt = null
         return OK
@@ -437,8 +438,8 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("timer:resume", async (ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host controla o cronômetro.")
-        if (board.timer.endsAt || board.timer.remainingMs <= 0) return fail("Nada para retomar.")
+        if (!isHost(board, me)) return fail("timer_host_only")
+        if (board.timer.endsAt || board.timer.remainingMs <= 0) return fail("timer_nothing_to_resume")
         board.timer.endsAt = Date.now() + board.timer.remainingMs
         return OK
       }),
@@ -448,7 +449,7 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("timer:reset", async (ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host controla o cronômetro.")
+        if (!isHost(board, me)) return fail("timer_host_only")
         board.timer = { ...board.timer, endsAt: null, remainingMs: board.timer.durationSec * 1000 }
         return OK
       }),
@@ -460,7 +461,7 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!isHost(board, me)) return fail("Só o host altera as configurações.")
+          if (!isHost(board, me)) return fail("settings_host_only")
           if (typeof patch.playlistOpen === "boolean") board.settings.playlistOpen = patch.playlistOpen
           return OK
         },
@@ -472,7 +473,7 @@ io.on("connection", (socket: AppSocket) => {
   socket.on("board:finish", async (ack) =>
     ack(
       await withBoard(socket, (board, me) => {
-        if (!isHost(board, me)) return fail("Só o host pode encerrar a retro.")
+        if (!isHost(board, me)) return fail("finish_host_only")
         board.finishedAt = Date.now()
         if (board.timer.endsAt) {
           board.timer.remainingMs = Math.max(board.timer.endsAt - Date.now(), 0)
@@ -488,7 +489,7 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!isHost(board, me)) return fail("Só o host pode reabrir a retro.")
+          if (!isHost(board, me)) return fail("reopen_host_only")
           board.finishedAt = null
           return OK
         },
