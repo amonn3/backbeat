@@ -154,9 +154,8 @@ app.post("/api/boards", async (req, res) => {
     return
   }
   const now = Date.now()
-  const title =
-    String(body.title ?? "").trim().slice(0, 80) ||
-    `Retro de ${new Date(now).toLocaleDateString("pt-BR")}`
+  // The client sends a title in the creator's language; this is only a fallback.
+  const title = String(body.title ?? "").trim().slice(0, 80) || `Retro ${new Date(now).toISOString().slice(0, 10)}`
   const board: Board = {
     id: boardId(),
     title,
