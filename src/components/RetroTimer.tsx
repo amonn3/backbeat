@@ -5,6 +5,7 @@ import type { Board } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useI18n } from "@/i18n"
 import { cn } from "@/lib/utils"
 
 const PRESETS = [3, 5, 10, 15]
@@ -43,6 +44,7 @@ function beep() {
 
 export function RetroTimer({ board, isHost, clockOffset, actions }: Props) {
   const { timer } = board
+  const { t } = useI18n()
   const [now, setNow] = useState(Date.now)
   const remaining = timer.endsAt
     ? Math.min(Math.max(timer.endsAt - (now + clockOffset), 0), timer.durationSec * 1000)
@@ -64,10 +66,10 @@ export function RetroTimer({ board, isHost, clockOffset, actions }: Props) {
   useEffect(() => {
     if (prevRef.current > 0 && remaining === 0 && timer.endsAt) {
       beep()
-      toast("⏰ Tempo esgotado!", { description: "Hora de parar de escrever e começar a discutir." })
+      toast(`⏰ ${t.timer.expiredToast}`, { description: t.timer.expiredToastDescription })
     }
     prevRef.current = remaining
-  }, [remaining, timer.endsAt])
+  }, [remaining, timer.endsAt, t])
 
   const parsedMinutes = Number(minutes.replace(",", "."))
   const minutesValid = Number.isFinite(parsedMinutes) && parsedMinutes > 0 && parsedMinutes <= 60
@@ -86,7 +88,7 @@ export function RetroTimer({ board, isHost, clockOffset, actions }: Props) {
         </span>
         <div>
           <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            {expired ? "Tempo esgotado" : running ? "Escrevendo cards" : paused ? "Pausado" : "Cronômetro"}
+            {expired ? t.timer.expired : running ? t.timer.running : paused ? t.timer.paused : t.timer.idle}
           </p>
           <p
             className={cn(
@@ -128,42 +130,42 @@ export function RetroTimer({ board, isHost, clockOffset, actions }: Props) {
               </div>
               <div className="flex items-center gap-1">
                 <Input
-                  aria-label="Minutos"
+                  aria-label={t.timer.minutes}
                   inputMode="decimal"
                   className="h-7 w-14 text-center"
                   value={minutes}
                   onChange={(e) => setMinutes(e.target.value)}
                   aria-invalid={!minutesValid}
                 />
-                <span className="text-xs text-muted-foreground">min</span>
+                <span className="text-xs text-muted-foreground">{t.timer.minutesShort}</span>
               </div>
               <Button
                 size="sm"
                 disabled={!minutesValid}
                 onClick={() => actions.startTimer(Math.round(parsedMinutes * 60))}
               >
-                <Play data-icon="inline-start" /> Iniciar
+                <Play data-icon="inline-start" /> {t.timer.start}
               </Button>
             </>
           )}
           {running && (
             <Button size="sm" variant="secondary" onClick={() => actions.pauseTimer()}>
-              <Pause data-icon="inline-start" /> Pausar
+              <Pause data-icon="inline-start" /> {t.timer.pause}
             </Button>
           )}
           {paused && (
             <Button size="sm" onClick={() => actions.resumeTimer()}>
-              <Play data-icon="inline-start" /> Retomar
+              <Play data-icon="inline-start" /> {t.timer.resume}
             </Button>
           )}
           {(running || paused || expired) && (
             <Button size="sm" variant="ghost" onClick={() => actions.resetTimer()}>
-              <RotateCcw data-icon="inline-start" /> Zerar
+              <RotateCcw data-icon="inline-start" /> {t.timer.reset}
             </Button>
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">O host controla o cronômetro.</p>
+        <p className="text-xs text-muted-foreground">{t.timer.hostControls}</p>
       )}
     </section>
   )
