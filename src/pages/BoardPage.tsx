@@ -15,6 +15,7 @@ import { Crown, FileText, Flag, Link2, Loader2, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { COLUMNS } from "@shared/types"
 import { Avatar } from "@/components/Avatar"
+import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { Logo } from "@/components/Logo"
 import { MiniPlayer } from "@/components/MiniPlayer"
 import { NameDialog } from "@/components/NameDialog"
@@ -33,11 +34,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useBoard } from "@/hooks/useBoard"
+import { useI18n } from "@/i18n"
 import { COLUMN_STYLES } from "@/lib/columns"
 import { getSavedName, hasJoined, markJoined, saveName } from "@/lib/identity"
 
 export default function BoardPage() {
   const { boardId = "" } = useParams()
+  const { t } = useI18n()
   const [name, setName] = useState<string | null>(() =>
     hasJoined(boardId) && getSavedName() ? getSavedName() : null,
   )
@@ -65,9 +68,9 @@ export default function BoardPage() {
       <main className="grid min-h-svh place-items-center px-4 text-center">
         <div className="space-y-4">
           <Logo className="justify-center" />
-          <p className="text-lg font-medium">{error ?? "Board não encontrado."}</p>
+          <p className="text-lg font-medium">{error ? t.errors[error] : t.board.notFound}</p>
           <Button render={<Link to="/" />} nativeButton={false}>
-            Criar um novo board
+            {t.board.createNew}
           </Button>
         </div>
       </main>
@@ -77,8 +80,9 @@ export default function BoardPage() {
   if (!name) {
     return (
       <div className="min-h-svh">
-        <header className="px-6 py-5">
+        <header className="flex items-center justify-between px-6 py-5">
           <Logo />
+          <LanguageSwitcher />
         </header>
         <NameDialog
           open
@@ -120,7 +124,7 @@ export default function BoardPage() {
     const from = (active.data.current as CardDragData).column
     const to = (over.data.current as CardDragData).column
     if (from !== to) {
-      toast.info("Só dá para agrupar cards da mesma coluna.")
+      toast.info(t.errors.merge_same_column)
       return
     }
     actions.mergeCards(String(active.id), String(over.id))
@@ -129,14 +133,16 @@ export default function BoardPage() {
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href)
-      toast.success("Link copiado! Mande para o time.")
+      toast.success(t.board.linkCopied)
     } catch {
       toast.info(window.location.href)
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-[1400px] flex-col gap-4 px-4 py-4 sm:px-6">
+    // On desktop the page is exactly one screen tall and each column scrolls on its own;
+    // on mobile the columns stack and the page scrolls as usual.
+    <div className="mx-auto flex min-h-svh max-w-[1400px] flex-col gap-4 px-4 py-4 sm:px-6 md:h-svh">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <Link to="/">
           <Logo />
@@ -145,8 +151,8 @@ export default function BoardPage() {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base font-semibold">{board.title}</h1>
           <p className="text-xs text-muted-foreground">
-            {onlineCount} online · {participants.length} participante(s)
-            {status === "connecting" && " · reconectando…"}
+            {t.board.presence(onlineCount, participants.length)}
+            {status === "connecting" && ` · ${t.board.reconnecting}`}
           </p>
         </div>
 
@@ -166,25 +172,26 @@ export default function BoardPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <LanguageSwitcher />
           <Button variant="outline" onClick={copyLink}>
-            <Link2 data-icon="inline-start" /> Compartilhar
+            <Link2 data-icon="inline-start" /> {t.board.share}
           </Button>
           {locked ? (
             <>
               <Button onClick={() => setReportOpen(true)}>
-                <FileText data-icon="inline-start" /> Relatório
+                <FileText data-icon="inline-start" /> {t.board.report}
               </Button>
               {isHost && (
                 <Button variant="ghost" onClick={() => actions.reopen()}>
-                  <RotateCcw data-icon="inline-start" /> Reabrir
+                  <RotateCcw data-icon="inline-start" /> {t.board.reopen}
                 </Button>
               )}
             </>
           ) : (
             isHost && (
               <Button onClick={() => setConfirmFinish(true)}>
-                <Flag data-icon="inline-start" /> Encerrar retro
+                <Flag data-icon="inline-start" /> {t.board.finish}
               </Button>
             )
           )}
@@ -193,11 +200,9 @@ export default function BoardPage() {
 
       {locked && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
-          <span>
-            🎬 Esta retro foi encerrada. Os cards estão bloqueados, mas o relatório está pronto.
-          </span>
+          <span>🎬 {t.board.finishedBanner}</span>
           <Button size="sm" onClick={() => setReportOpen(true)}>
-            <FileText data-icon="inline-start" /> Gerar relatório .md
+            <FileText data-icon="inline-start" /> {t.board.generateReport}
           </Button>
         </div>
       )}
@@ -212,12 +217,13 @@ export default function BoardPage() {
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragId(null)}
       >
-        <main className="grid flex-1 gap-4 md:grid-cols-3">
-          {COLUMNS.map((col) => (
+        <main className="grid flex-1 gap-4 md:min-h-72 md:grid-cols-3">
+          {COLUMNS.map((id) => (
             <RetroColumn
-              key={col.id}
-              {...col}
-              cards={board.cards.filter((c) => c.column === col.id)}
+              key={id}
+              id={id}
+              title={t.columns[id]}
+              cards={board.cards.filter((c) => c.column === id)}
               me={participantId}
               isHost={isHost}
               locked={locked}
@@ -238,21 +244,16 @@ export default function BoardPage() {
         </DragOverlay>
       </DndContext>
 
-      <p className="pb-2 text-center text-xs text-muted-foreground">
-        Dica: arraste um card sobre outro da mesma coluna para agrupar assuntos relacionados.
-      </p>
+      <p className="text-center text-xs text-muted-foreground">{t.board.dragTip}</p>
 
       <Dialog open={confirmFinish} onOpenChange={setConfirmFinish}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Encerrar a retro?</DialogTitle>
-            <DialogDescription>
-              Os cards ficam bloqueados para todos e o relatório em Markdown fica disponível para download. Você
-              pode reabrir depois, se precisar.
-            </DialogDescription>
+            <DialogTitle>{t.board.finishTitle}</DialogTitle>
+            <DialogDescription>{t.board.finishDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+            <DialogClose render={<Button variant="outline" />}>{t.board.cancel}</DialogClose>
             <Button
               onClick={async () => {
                 if (await actions.finish()) {
@@ -261,7 +262,7 @@ export default function BoardPage() {
                 }
               }}
             >
-              Encerrar e gerar relatório
+              {t.board.finishConfirm}
             </Button>
           </DialogFooter>
         </DialogContent>

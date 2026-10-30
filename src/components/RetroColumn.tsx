@@ -13,13 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useI18n } from "@/i18n"
 import { COLUMN_STYLES } from "@/lib/columns"
 import { cn } from "@/lib/utils"
 
 interface Props {
   id: ColumnId
   title: string
-  emoji: string
   cards: Card[]
   me: string
   isHost: boolean
@@ -27,7 +27,8 @@ interface Props {
   actions: BoardActions
 }
 
-export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actions }: Props) {
+export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: Props) {
+  const { t } = useI18n()
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
@@ -54,16 +55,13 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
   return (
     <section
       className={cn(
-        "flex min-h-80 flex-col rounded-2xl border bg-gradient-to-b to-card/40 to-40% p-3",
+        "flex min-h-80 flex-col rounded-2xl border bg-gradient-to-b to-card/40 to-40% p-3 md:min-h-0",
         style.glow,
       )}
     >
       <header className="mb-3 flex items-center gap-2 px-1">
         <span className={cn("size-2 rounded-full", style.dot)} />
-        <h2 className="flex-1 truncate text-sm font-semibold">
-          <span className="mr-1.5">{emoji}</span>
-          {title}
-        </h2>
+        <h2 className="flex-1 truncate text-sm font-semibold">{title}</h2>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground tabular-nums">
           {itemCount}
         </span>
@@ -71,8 +69,8 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label={`Limpar coluna ${title}`}
-            title="Limpar coluna"
+            aria-label={t.column.clearAria(title)}
+            title={t.column.clear}
             disabled={cards.length === 0}
             onClick={() => setConfirmClear(true)}
           >
@@ -83,8 +81,8 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
           <Button
             size="icon-sm"
             variant="secondary"
-            aria-label={`Adicionar card em ${title}`}
-            title="Adicionar card"
+            aria-label={t.column.addAria(title)}
+            title={t.column.add}
             onClick={() => setComposing(true)}
           >
             <Plus />
@@ -92,40 +90,41 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
         )}
       </header>
 
-      <div className="flex flex-1 flex-col gap-2.5">
-        {composing && !locked && (
-          <div className={cn("rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
-            <textarea
-              autoFocus
-              rows={3}
-              maxLength={500}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="Escreva o título do card…"
-              className="w-full resize-none bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <div className="flex items-center justify-between gap-2">
-              <span className="pl-1.5 text-[11px] text-muted-foreground">Enter salva · Shift+Enter quebra linha</span>
-              <div className="flex gap-1">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => {
-                    setComposing(false)
-                    setText("")
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button size="xs" disabled={!text.trim()} onClick={submit}>
-                  Adicionar
-                </Button>
-              </div>
+      {composing && !locked && (
+        <div className={cn("mb-2.5 rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
+          <textarea
+            autoFocus
+            rows={3}
+            maxLength={500}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={t.column.placeholder}
+            className="w-full resize-none bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted-foreground"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="pl-1.5 text-[11px] text-muted-foreground">{t.column.hint}</span>
+            <div className="flex gap-1">
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => {
+                  setComposing(false)
+                  setText("")
+                }}
+              >
+                {t.column.cancel}
+              </Button>
+              <Button size="xs" disabled={!text.trim()} onClick={submit}>
+                {t.column.submit}
+              </Button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
+      {/* Only the card list scrolls, so a long column never stretches the page. */}
+      <div className="scroll-thin -mx-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-1 py-1">
         {cards.map((card) => (
           <RetroCard
             key={card.id}
@@ -145,7 +144,7 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
             onClick={() => setComposing(true)}
             className="grid flex-1 place-items-center rounded-2xl border border-dashed text-xs text-muted-foreground transition enabled:hover:border-primary/40 enabled:hover:text-foreground"
           >
-            {locked ? "Nenhum card" : "Clique no + para adicionar um card"}
+            {locked ? t.column.empty : t.column.emptyCta}
           </button>
         )}
       </div>
@@ -153,21 +152,18 @@ export function RetroColumn({ id, title, emoji, cards, me, isHost, locked, actio
       <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Limpar “{title}”?</DialogTitle>
-            <DialogDescription>
-              Os {cards.length} card(s) desta coluna serão removidos para todos os participantes. Não dá para
-              desfazer.
-            </DialogDescription>
+            <DialogTitle>{t.column.clearTitle(title)}</DialogTitle>
+            <DialogDescription>{t.column.clearDescription(cards.length)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+            <DialogClose render={<Button variant="outline" />}>{t.column.cancel}</DialogClose>
             <Button
               variant="destructive"
               onClick={async () => {
                 if (await actions.clearColumn(id)) setConfirmClear(false)
               }}
             >
-              Limpar coluna
+              {t.column.clear}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,10 +1,37 @@
 export type ColumnId = "good" | "improve" | "bad"
 
-export const COLUMNS: { id: ColumnId; title: string; emoji: string }[] = [
-  { id: "good", title: "O que foi bom", emoji: "😄" },
-  { id: "improve", title: "O que precisa melhorar", emoji: "🤔" },
-  { id: "bad", title: "O que foi péssimo", emoji: "😩" },
-]
+/** Column order on the board. Titles are translated on the client. */
+export const COLUMNS: ColumnId[] = ["good", "improve", "bad"]
+
+/** Server errors travel as codes so each client shows them in its own language. */
+export type ErrorCode =
+  | "name_required"
+  | "not_in_board"
+  | "board_not_found"
+  | "board_finished"
+  | "join_failed"
+  | "card_title_required"
+  | "invalid_column"
+  | "card_not_found"
+  | "delete_forbidden"
+  | "merge_same_card"
+  | "merge_same_column"
+  | "not_grouped"
+  | "clear_host_only"
+  | "invalid_youtube"
+  | "playlist_host_only"
+  | "track_not_found"
+  | "timer_host_only"
+  | "timer_range"
+  | "timer_not_running"
+  | "timer_nothing_to_resume"
+  | "settings_host_only"
+  | "finish_host_only"
+  | "reopen_host_only"
+  | "too_many_changes"
+  | "create_failed"
+  | "unexpected"
+  | "noop"
 
 export interface CardItem {
   id: string
@@ -75,12 +102,12 @@ export interface CreateBoardRequest {
   playlistOpen: boolean
 }
 
-export type Ack = { ok: true } | { ok: false; error: string }
+export type Ack = { ok: true } | { ok: false; error: ErrorCode }
 
 export interface ClientToServerEvents {
   "board:join": (
     payload: { boardId: string; participantId: string; name: string },
-    ack: (res: { ok: true; snapshot: BoardSnapshot } | { ok: false; error: string }) => void,
+    ack: (res: { ok: true; snapshot: BoardSnapshot } | { ok: false; error: ErrorCode }) => void,
   ) => void
   "card:add": (payload: { column: ColumnId; text: string }, ack: (res: Ack) => void) => void
   "card:delete": (payload: { cardId: string }, ack: (res: Ack) => void) => void

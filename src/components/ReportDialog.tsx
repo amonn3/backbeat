@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useI18n } from "@/i18n"
 import { buildReport, downloadReport } from "@/lib/report"
 
 interface Props {
@@ -21,14 +22,15 @@ interface Props {
 }
 
 export function ReportDialog({ board, open, onOpenChange }: Props) {
-  const markdown = useMemo(() => (open ? buildReport(board) : ""), [board, open])
+  const { t } = useI18n()
+  const markdown = useMemo(() => (open ? buildReport(board, t) : ""), [board, open, t])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Relatório da retro</DialogTitle>
-          <DialogDescription>Prévia do arquivo Markdown com tudo que o time registrou.</DialogDescription>
+          <DialogTitle>{t.report.dialogTitle}</DialogTitle>
+          <DialogDescription>{t.report.dialogDescription}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[55vh] rounded-lg border bg-background/60">
           <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -36,9 +38,9 @@ export function ReportDialog({ board, open, onOpenChange }: Props) {
           </pre>
         </ScrollArea>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Fechar</DialogClose>
-          <Button onClick={() => downloadReport(board)}>
-            <Download data-icon="inline-start" /> Baixar .md
+          <DialogClose render={<Button variant="outline" />}>{t.report.close}</DialogClose>
+          <Button onClick={() => downloadReport(board, t)}>
+            <Download data-icon="inline-start" /> {t.report.download}
           </Button>
         </DialogFooter>
       </DialogContent>
