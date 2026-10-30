@@ -9,6 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { LanguageSwitcher } from "@/components/LanguageSwitcher"
+import { useI18n } from "@/i18n"
 import { getSavedName } from "@/lib/identity"
 
 interface Props {
@@ -19,8 +21,10 @@ interface Props {
 
 /** Blocking dialog: you can only enter a board after filling a non-empty name. */
 export function NameDialog({ open, boardTitle, onSubmit }: Props) {
+  const { t } = useI18n()
   const [name, setName] = useState(getSavedName)
   const valid = name.trim().length > 0
+  const intro = boardTitle ? t.nameDialog.withBoard(boardTitle) : null
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -32,29 +36,33 @@ export function NameDialog({ open, boardTitle, onSubmit }: Props) {
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle className="text-lg">Você foi convidado para uma retro 🎧</DialogTitle>
+            <div className="flex items-start justify-between gap-3">
+              <DialogTitle className="text-lg leading-snug">{t.nameDialog.title}</DialogTitle>
+              <LanguageSwitcher className="shrink-0" />
+            </div>
             <DialogDescription>
-              {boardTitle ? (
+              {intro ? (
                 <>
-                  Para entrar em <span className="font-medium text-foreground">{boardTitle}</span>, diga como o
-                  time deve te chamar.
+                  {intro.before}
+                  <span className="font-medium text-foreground">{intro.title}</span>
+                  {intro.after}
                 </>
               ) : (
-                "Diga como o time deve te chamar."
+                t.nameDialog.withoutBoard
               )}
             </DialogDescription>
           </DialogHeader>
           <Input
             autoFocus
             maxLength={40}
-            placeholder="Seu nome"
+            placeholder={t.nameDialog.placeholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="h-10"
           />
           <DialogFooter>
             <Button type="submit" disabled={!valid} className="h-9 px-4">
-              Entrar no board
+              {t.nameDialog.submit}
             </Button>
           </DialogFooter>
         </form>
