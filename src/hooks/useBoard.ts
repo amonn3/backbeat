@@ -7,8 +7,10 @@ import type {
   BoardSettings,
   ClientToServerEvents,
   ColumnId,
+  ErrorCode,
   ServerToClientEvents,
 } from "@shared/types"
+import { useI18n } from "@/i18n"
 import { getParticipantId } from "@/lib/identity"
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>
@@ -18,10 +20,16 @@ export type ConnectionStatus = "connecting" | "joined" | "error"
 export function useBoard(boardId: string, name: string | null) {
   const [board, setBoard] = useState<Board | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>("connecting")
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<ErrorCode | null>(null)
   /** serverTime - clientTime, so every browser renders the same countdown. */
   const [clockOffset, setClockOffset] = useState(0)
   const socketRef = useRef<AppSocket | null>(null)
+  const { t } = useI18n()
+  // Read through a ref so switching language doesn't recreate every action.
+  const errorsRef = useRef(t.errors)
+  useEffect(() => {
+    errorsRef.current = t.errors
+  }, [t])
   const participantId = getParticipantId()
 
   useEffect(() => {
@@ -65,7 +73,7 @@ export function useBoard(boardId: string, name: string | null) {
     if (!socket) return Promise.resolve(false)
     return new Promise<boolean>((resolve) => {
       send(socket, (res) => {
-        if (!res.ok) toast.error(res.error)
+        if (!res.ok) toast.error(errorsRef.current[res.error] ?? errorsRef.current.unexpected)
         resolve(res.ok)
       })
     })
