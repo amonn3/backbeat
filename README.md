@@ -1,106 +1,156 @@
-# Backbeat
+<p align="center">
+  <img src="docs/assets/backbeat-logo.svg" width="560" alt="Backbeat — team retrospectives with a soundtrack" />
+</p>
 
-**Backbeat is everything a tech team needs to run its retrospective — no paid features, ready to use.**
+<p align="center">
+  <strong>Create a board. Bring the team. Give your retro a soundtrack.</strong>
+</p>
 
-Create a board, share the link and let the team write what went well, what needs to improve and what went
-badly, with a shared YouTube soundtrack playing and a timer everyone sees in sync. When the meeting ends,
-download a Markdown report with everything that was discussed.
+<p align="center">
+  <a href="https://github.com/amonn3/backbeat/actions/workflows/deploy.yml"><img src="https://github.com/amonn3/backbeat/actions/workflows/deploy.yml/badge.svg?branch=main" alt="Production deployment" /></a>
+  <a href="https://backbeat-delta.vercel.app"><img src="https://img.shields.io/badge/open-Backbeat-8b5cf6?logo=vercel&logoColor=white" alt="Open Backbeat" /></a>
+  <img src="https://img.shields.io/badge/React-TypeScript-3178c6?logo=typescript&logoColor=white" alt="React and TypeScript" />
+</p>
 
-Created and idealized by **Amon** ([amonn3](https://github.com/amonn3)).
+---
 
-🔗 **Live:** https://backbeat-delta.vercel.app
+Backbeat is a retrospective tool for technology teams. Create a board, share the link, and let everyone
+write what went well, what needs to improve, and what went badly. A shared YouTube soundtrack and a
+synchronized timer keep the writing session moving; a Markdown report captures the discussion afterward.
+
+There is no sign-up. Each browser keeps a lightweight identity, and the person who creates the board
+hosts the session. The interface follows your browser language, with **English** and **Português**
+available from the language selector. Your language and volume preferences are saved locally when
+browser storage is available.
 
 ## Features
 
-- **Ready in seconds** — enter your name, optionally name the retro and create the board. No sign-up.
-- **Invite by link** — whoever opens the link picks a name before joining; empty names are blocked.
-- **Three classic columns** — _What went well_, _What needs to improve_ and _What went badly_. Each column
-  scrolls on its own, so a busy column never pushes the rest of the board away.
-- **Cards** — rounded cards with the title and the author in the bottom-left corner. The author or the host
-  can remove them.
-- **Move and group cards** — drag cards between columns, including empty ones. Drop onto another card in the
-  same column to merge them; ungroup anytime. Click outside the card composer to close it; drafts are kept.
-- **Shared soundtrack** — a YouTube mini player with synchronized play, pause and playback position,
-  including late joins and reconnects. Only the host can play, pause or switch tracks. Guests can add and
-  remove queued songs when the host enables that permission (off by default); only the host can remove
-  the current song. Volume and mute are personal and available to everyone. If the browser blocks autoplay,
-  each listener can click “Enable audio” to follow the shared playback.
-- **Synced timer** — the host picks 30s, 1, 3 or 5 minutes (or any value up to 60 min), then starts, pauses
-  or resets it. Everyone sees the same countdown and hears a chime at the end. When time runs out,
-  the soundtrack pauses and the player collapses for everyone; it can be expanded again.
-- **Host tools** — clear a column, end the retro (locks the cards) and reopen it if needed.
-- **Markdown report** — overview, per-column summary, groups, contributions and the soundtrack, ready to
-  paste into your wiki.
-- **English and Portuguese** — the app follows the browser language and anyone can switch at any time.
-  Each person sees the board, errors and report in their own language.
+- **Ready in seconds.** Enter your name, optionally name the retro, and create a board. Invite the team by link.
+- **Three retrospective columns.** _What went well_, _What needs to improve_, and _What went badly_. Each column scrolls independently on desktop.
+- **Cards and groups.** Add topics, move cards or entire groups between columns, and drop a card onto another in the same column to group related topics. Ungroup whenever needed. Clicking outside the composer closes it and keeps the unsent draft.
+- **Synchronized soundtrack.** Play, pause, and playback position follow shared server state, including late joins and reconnects. Periodic corrections help listeners recover from drift and buffering.
+- **Host-controlled playback.** Only the host can play, pause, or switch songs. Guest permission to add and remove queued songs is off by default and can be changed by the host. Only the host can remove the current song.
+- **Personal volume.** Every participant can adjust volume or mute their own player without changing anyone else's audio.
+- **Shared countdown.** Choose 30 seconds, 1, 3, or 5 minutes, or a custom duration up to 60 minutes. The host starts, pauses, resumes, and resets the timer.
+- **Discussion transition.** When time runs out, everyone receives the notification, the soundtrack pauses, and the player collapses. Expand it again whenever needed.
+- **Host tools and reports.** Clear columns, end the retro to lock cards, reopen it, or download a Markdown report with contributions, groups, and the soundtrack. Card authors and the host can delete their cards.
+- **English and Portuguese.** Each participant chooses their own language for the interface, errors, and downloaded report.
 
-## Getting started
+## Try it now
 
-Requirements: Node.js 22+.
+**[Open Backbeat →](https://backbeat-delta.vercel.app)**
+
+1. Enter your name and, optionally, a name for the retrospective.
+2. Decide whether guests may add and remove queued songs, then create the board.
+3. Share the board link. Guests enter their names before joining.
+4. Add YouTube links to the queue. The host starts playback; each participant sets their own volume.
+5. Start the countdown and write cards. Move topics between columns or group related cards in the same column.
+6. When the countdown ends, discuss the cards with the music paused and the player collapsed.
+7. End the retro and download the Markdown report. The host can reopen the board if needed.
+
+If your browser blocks autoplay, click **Enable audio** to follow the shared playback. To try a guest
+session locally, open the board link in a private window or another browser.
+
+The public version follows `main`: updates appear after the production deployment workflow completes.
+
+## How it works
+
+```text
+Host and guest browsers
+        │
+        ├── HTTP ──────► Create or preview a board
+        │
+        └── Socket.IO ► Validate permissions ──► Persist board ──► Broadcast state
+                                                       │                 │
+                                             Redis or local file         ▼
+                                                               Cards, timer and player
+
+                         Volume and mute stay in each browser
+```
+
+React renders the board, dnd-kit handles card dragging, and the YouTube IFrame API plays the soundtrack.
+Express and Socket.IO validate actions on the server and broadcast board snapshots with the server time.
+Playback uses a shared position and timestamp; the timer uses a shared deadline so clients can follow
+the same session clock.
+
+Without Redis, the server keeps boards in memory and saves them to `data/boards.json`. With `REDIS_URL`
+or `KV_URL` configured, Redis stores boards, compare-and-set writes handle concurrent changes, and the
+Socket.IO Redis adapter distributes room updates between server instances. Presence is refreshed by
+client heartbeats. Redis boards expire after 30 days without a persisted change.
+
+## Run locally
+
+You need **Node.js 22+** and npm.
 
 ```bash
-npm install
-npm run dev        # API on :3101 + web app (Vite) on :5173
+git clone https://github.com/amonn3/backbeat.git
+cd backbeat
+npm ci
+npm run dev
 ```
 
-Run `npm test` for the real-time integration tests, `npm run typecheck` for TypeScript and `npm run lint`
-for lint checks. Integration tests use an isolated temporary data directory.
-
-Open http://localhost:5173. To try it with someone else, open the board link in a private window.
-
-Without Redis configured, boards live in memory and are saved to `data/boards.json`, which is all you need
-locally.
-
-### Production build without Vercel
+Open **http://localhost:5173**. The development command runs the API on **:3101** and Vite on **:5173**,
+with API and WebSocket requests proxied to the backend. Redis and API keys are not required locally.
 
 ```bash
-npm run build
-npm start          # serves API + web app on http://localhost:3101 (set PORT to change it)
+npm test              # real-time integration tests with isolated temporary storage
+npm run typecheck     # TypeScript validation
+npm run lint          # lint checks
+npm run build         # production frontend build and TypeScript validation
+npm start             # serve the API and built frontend on http://localhost:3101
 ```
 
-## Deploying to Vercel
+Run `npm run build` before `npm start`. Set `PORT` to change the standalone server port.
+For isolated local board storage, set `BACKBEAT_DATA_DIR`; the default is `data/`.
 
-The web app is served as static files and a single Vercel Function (`api/index.ts`) handles the REST API and
-the Socket.IO WebSocket.
+Translations live in [`src/i18n/`](src/i18n). To add a language, copy `en.ts`, translate the messages,
+register the dictionary in `I18nProvider.tsx`, and add the language to `context.ts`. TypeScript checks
+that both existing languages expose the same messages.
 
-1. Create the project and add **Upstash for Redis** from the Vercel Marketplace (the free plan is enough).
-   It provides `REDIS_URL`, which switches the app to the Redis store.
-2. Deploy with `vercel deploy --prod`, or push to `main`: the GitHub Actions workflow in
-   `.github/workflows/deploy.yml` runs typecheck and lint, then deploys to production. It needs the
-   `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` repository secrets.
+## Deploy to Vercel
 
-Why Redis: Vercel Function instances don't share memory, so boards are stored in Redis with compare-and-set
-writes (no lost updates when many people type at once), rooms are synced across instances with the Socket.IO
-Redis adapter, and presence is tracked with client heartbeats. Boards expire after 30 days without changes.
-On the Hobby plan WebSocket connections last up to 5 minutes; the client reconnects and rejoins on its own.
+The repository includes [`vercel.json`](vercel.json) for the frontend and API entry point, and a
+[production workflow](.github/workflows/deploy.yml) triggered by pushes to `main` or a manual run.
 
-## Tech stack
+1. Create a Vercel project for the repository.
+2. Configure Redis through `REDIS_URL` or `KV_URL` so board state can be shared between instances.
+3. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` to the repository's GitHub Actions secrets.
+4. Push or merge to `main`, or run the production workflow manually.
 
-- React 19, Vite, TypeScript, Tailwind CSS v4 and shadcn/ui (Base UI)
-- Express and Socket.IO, with Redis (production) or an in-memory/file store (development)
-- dnd-kit for drag and drop
-- YouTube IFrame API for the player
+The workflow installs dependencies, runs typecheck and lint, builds the application, and deploys the
+production output. Run `npm test` locally before submitting a change; integration tests are not currently
+part of that workflow. The real-time backend requires WebSocket support from its hosting environment.
 
-## Project structure
+## Known limitations
 
-```
-api/       Vercel Function entry point
-server/    REST API, Socket.IO events and the store (Redis or file)
-shared/    types and rules shared by the client and the server
-src/
-  i18n/      translations (en, pt) and the language provider
-  pages/     home and board pages
-  components/
-  hooks/     useBoard: connection, state and actions
-  lib/       report builder, identity, YouTube helpers
-```
+- **Lightweight identities.** Browser-stored IDs are intended for teams that trust each other. They are not authenticated accounts; using another browser or clearing storage changes your identity.
+- **YouTube and browser playback policies.** Soundtrack playback requires access to YouTube and an embeddable video. A browser may require each listener to enable audio before following playback.
+- **Synchronization has practical limits.** Shared timestamps and periodic corrections reduce drift, but network latency, buffering, and browser scheduling prevent sample-accurate audio across devices. The host's player advances the queue when a track ends.
+- **Local storage is single-process.** The file store is suitable for local development or a standalone server. Multiple backend instances need shared Redis state and the room adapter.
+- **Integration coverage has a defined scope.** Automated tests exercise HTTP and Socket.IO behavior for permissions, playback state, card movement, and timer expiration. They do not validate real YouTube audio or browser drag-and-drop interactions.
 
-## Adding a language
+## Documentation
 
-Copy `src/i18n/en.ts`, translate the strings (TypeScript flags anything missing), register it in
-`src/i18n/I18nProvider.tsx` and add its code to `LANGS` in `src/i18n/context.ts`.
+| Document | Contents |
+| --- | --- |
+| [Changelog](CHANGELOG.md) | Released changes and the current unreleased work |
+| [Shared types](shared/types.ts) | Board model, event contracts, and shared helpers |
+| [Real-time server](server/app.ts) | API routes, permission checks, and board events |
+| [Persistence](server/store.ts) | Redis and local file stores |
+| [Integration tests](tests/realtime.test.ts) | Real-time regression scenarios |
+| [Workflow](.github/workflows/deploy.yml) | Validation and production deployment |
 
-## Notes
+## Contributing
 
-Identities are lightweight: each browser gets an id stored locally, with no login. That's great for a team
-that trusts each other, but it isn't real authentication.
+[Issues](https://github.com/amonn3/backbeat/issues) and pull requests are welcome. For a bug report,
+include the browser, whether you were the host or a guest, the relevant playlist permission, steps to
+reproduce, and the expected behavior. Avoid including private retrospective content.
+
+Before submitting a change, run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build`.
+Changes to shared state or permissions should include a regression case. Update both languages when
+adding interface text, and keep unrelated changes in separate, atomic commits so contributions are easy
+to review.
+
+## Author
+
+Created and idealized by **Amon ([amonn3](https://github.com/amonn3))**.
