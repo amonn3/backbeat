@@ -52,7 +52,7 @@ export const en: Dict = {
     finish: "End retro",
     finishedBanner: "This retro has ended. Cards are locked, but the report is ready.",
     generateReport: "Generate .md report",
-    dragTip: "Tip: drag a card onto another one in the same column to group related topics.",
+    dragTip: "Tip: drag cards between columns, or onto another card in the same column to group topics.",
     finishTitle: "End the retro?",
     finishDescription:
       "Cards get locked for everyone and the Markdown report becomes available to download. You can reopen it later if needed.",

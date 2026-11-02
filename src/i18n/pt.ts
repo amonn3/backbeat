@@ -52,7 +52,7 @@ export const pt = {
     finish: "Encerrar retro",
     finishedBanner: "Esta retro foi encerrada. Os cards estão bloqueados, mas o relatório está pronto.",
     generateReport: "Gerar relatório .md",
-    dragTip: "Dica: arraste um card sobre outro da mesma coluna para agrupar assuntos relacionados.",
+    dragTip: "Dica: arraste cards entre colunas ou sobre outro da mesma coluna para agrupar assuntos.",
     finishTitle: "Encerrar a retro?",
     finishDescription:
       "Os cards ficam bloqueados para todos e o relatório em Markdown fica disponível para download. Você pode reabrir depois, se precisar.",

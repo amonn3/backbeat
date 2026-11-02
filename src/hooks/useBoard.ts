@@ -82,6 +82,7 @@ export function useBoard(boardId: string, name: string | null) {
   const actions = useMemo(
     () => ({
       addCard: (column: ColumnId, text: string) => call((s, d) => s.emit("card:add", { column, text }, d)),
+      moveCard: (cardId: string, column: ColumnId) => call((s, d) => s.emit("card:move", { cardId, column }, d)),
       deleteCard: (cardId: string) => call((s, d) => s.emit("card:delete", { cardId }, d)),
       mergeCards: (sourceId: string, targetId: string) =>
         call((s, d) => s.emit("card:merge", { sourceId, targetId }, d)),

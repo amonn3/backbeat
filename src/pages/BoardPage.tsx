@@ -6,6 +6,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -124,10 +125,10 @@ export default function BoardPage() {
     const from = (active.data.current as CardDragData).column
     const to = (over.data.current as CardDragData).column
     if (from !== to) {
-      toast.info(t.errors.merge_same_column)
+      actions.moveCard(String(active.id), to)
       return
     }
-    actions.mergeCards(String(active.id), String(over.id))
+    if (!String(over.id).startsWith("column:")) actions.mergeCards(String(active.id), String(over.id))
   }
 
   async function copyLink() {
@@ -212,7 +213,10 @@ export default function BoardPage() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={(args) => {
+          const hits = args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args)
+          return hits.sort((a, b) => Number(String(a.id).startsWith("column:")) - Number(String(b.id).startsWith("column:")))
+        }}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragId(null)}

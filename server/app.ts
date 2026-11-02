@@ -259,6 +259,16 @@ io.on("connection", (socket: AppSocket) => {
     ),
   )
 
+  socket.on("card:move", async ({ cardId, column }, ack) =>
+    ack(await withBoard(socket, (board) => {
+      if (!COLUMNS.includes(column)) return fail("invalid_column")
+      const card = board.cards.find((c) => c.id === cardId)
+      if (!card) return fail("card_not_found")
+      card.column = column
+      return OK
+    })),
+  )
+
   socket.on("card:delete", async ({ cardId }, ack) =>
     ack(
       await withBoard(socket, (board, me) => {

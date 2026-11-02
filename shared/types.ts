@@ -110,6 +110,7 @@ export interface ClientToServerEvents {
     ack: (res: { ok: true; snapshot: BoardSnapshot } | { ok: false; error: ErrorCode }) => void,
   ) => void
   "card:add": (payload: { column: ColumnId; text: string }, ack: (res: Ack) => void) => void
+  "card:move": (payload: { cardId: string; column: ColumnId }, ack: (res: Ack) => void) => void
   "card:delete": (payload: { cardId: string }, ack: (res: Ack) => void) => void
   "card:merge": (payload: { sourceId: string; targetId: string }, ack: (res: Ack) => void) => void
   "card:split": (payload: { cardId: string }, ack: (res: Ack) => void) => void
