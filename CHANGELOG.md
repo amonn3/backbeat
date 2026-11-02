@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Synchronize soundtrack play, pause and playback position, including late joins and reconnects.
+- Restrict playback and track switching to the board host; guest queue permissions default to off.
+- Keep volume and mute available locally to every participant.
+- Pause music and collapse the player for everyone when the countdown expires, preserving the notification.
+- Close the card composer on outside clicks, keeping unsent drafts.
+- Allow cards and groups to move between columns while preserving same-column grouping.
+- Add isolated Socket.IO integration tests for permissions, playback, timer expiration and card movement.
+
 ## 0.2.0 — 2026-10-30
 
 ### Added

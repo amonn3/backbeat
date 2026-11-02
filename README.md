@@ -18,11 +18,16 @@ Created and idealized by **Amon** ([amonn3](https://github.com/amonn3)).
   scrolls on its own, so a busy column never pushes the rest of the board away.
 - **Cards** — rounded cards with the title and the author in the bottom-left corner. The author or the host
   can remove them.
-- **Group related topics** — drag a card onto another one in the same column to merge them; ungroup anytime.
-- **Shared soundtrack** — a YouTube mini player with a shared queue. The host decides, when creating the
-  board, whether everyone can manage the playlist or only the host (and can change it later).
+- **Move and group cards** — drag cards between columns, including empty ones. Drop onto another card in the
+  same column to merge them; ungroup anytime. Click outside the card composer to close it; drafts are kept.
+- **Shared soundtrack** — a YouTube mini player with synchronized play, pause and playback position,
+  including late joins and reconnects. Only the host can play, pause or switch tracks. Guests can add and
+  remove queued songs when the host enables that permission (off by default); only the host can remove
+  the current song. Volume and mute are personal and available to everyone. If the browser blocks autoplay,
+  each listener can click “Enable audio” to follow the shared playback.
 - **Synced timer** — the host picks 30s, 1, 3 or 5 minutes (or any value up to 60 min), then starts, pauses
-  or resets it. Everyone sees the same countdown and hears a chime at the end.
+  or resets it. Everyone sees the same countdown and hears a chime at the end. When time runs out,
+  the soundtrack pauses and the player collapses for everyone; it can be expanded again.
 - **Host tools** — clear a column, end the retro (locks the cards) and reopen it if needed.
 - **Markdown report** — overview, per-column summary, groups, contributions and the soundtrack, ready to
   paste into your wiki.
@@ -37,6 +42,9 @@ Requirements: Node.js 22+.
 npm install
 npm run dev        # API on :3101 + web app (Vite) on :5173
 ```
+
+Run `npm test` for the real-time integration tests, `npm run typecheck` for TypeScript and `npm run lint`
+for lint checks. Integration tests use an isolated temporary data directory.
 
 Open http://localhost:5173. To try it with someone else, open the board link in a private window.
 
