@@ -92,7 +92,7 @@ export function redisStore(client: RedisClient): Store {
 
 /** Single-process store for local development, persisted to data/boards.json. */
 export function fileStore(): Store {
-  const dataDir = path.resolve(import.meta.dirname, "../data")
+  const dataDir = process.env.BACKBEAT_DATA_DIR ?? path.resolve(import.meta.dirname, "../data")
   const dataFile = path.join(dataDir, "boards.json")
   const boards = new Map<string, Board>()
   const presence = new Map<string, Map<string, { participantId: string; expiresAt: number }>>()
