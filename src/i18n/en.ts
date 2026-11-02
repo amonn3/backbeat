@@ -90,6 +90,8 @@ export const en: Dict = {
   },
 
   player: {
+    expand: "Expand player",
+    collapse: "Collapse player",
     play: "Play",
     pause: "Pause",
     enableAudio: "Enable audio",

@@ -65,6 +65,7 @@ export interface Participant {
 }
 
 export interface TimerState {
+  completed?: boolean
   durationSec: number
   /** Epoch ms when the countdown hits zero; null while stopped or paused. */
   endsAt: number | null
@@ -78,6 +79,7 @@ export interface BoardSettings {
 }
 
 export interface PlaybackState {
+  collapsed: boolean
   playing: boolean
   positionSec: number
   updatedAt: number
@@ -134,6 +136,7 @@ export interface ClientToServerEvents {
   "track:ended": (payload: { index: number; updatedAt: number }) => void
   "presence:ping": () => void
   "track:title": (payload: { trackId: string; title: string }) => void
+  "timer:expire": (payload: { endsAt: number }) => void
   "timer:start": (payload: { durationSec: number }, ack: (res: Ack) => void) => void
   "timer:pause": (ack: (res: Ack) => void) => void
   "timer:resume": (ack: (res: Ack) => void) => void

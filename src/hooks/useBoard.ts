@@ -67,6 +67,14 @@ export function useBoard(boardId: string, name: string | null) {
     }
   }, [boardId, name, participantId])
 
+  useEffect(() => {
+    const deadline = board?.timer.endsAt
+    if (!deadline || board?.timer.completed) return
+    const expire = () => socketRef.current?.emit("timer:expire", { endsAt: deadline })
+    const timeout = setTimeout(expire, Math.max(0, deadline - Date.now() - clockOffset))
+    return () => clearTimeout(timeout)
+  }, [board?.timer.endsAt, board?.timer.completed, clockOffset])
+
   /** Emits an acked event and surfaces server-side rejections as toasts. */
   const call = useCallback((send: (socket: AppSocket, done: (res: Ack) => void) => void) => {
     const socket = socketRef.current

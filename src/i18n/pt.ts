@@ -90,6 +90,8 @@ export const pt = {
   },
 
   player: {
+    expand: "Expandir player",
+    collapse: "Recolher player",
     play: "Reproduzir",
     pause: "Pausar",
     enableAudio: "Ativar áudio",

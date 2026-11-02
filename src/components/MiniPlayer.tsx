@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Lock, Music2, Pause, Play, Plus, SkipBack, SkipForward, Trash2, Volume1, Volume2, VolumeX } from "lucide-react"
+import { ChevronDown, ChevronUp, Lock, Music2, Pause, Play, Plus, SkipBack, SkipForward, Trash2, Volume1, Volume2, VolumeX } from "lucide-react"
 import { canManagePlaylist, isPlaceholderTitle, playbackPosition, parseYouTubeId, type Board, type Track } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
 import { useI18n } from "@/i18n"
@@ -31,6 +31,17 @@ export function MiniPlayer({ board, me, actions, clockOffset }: Props) {
   const [ready, setReady] = useState(false)
   const [url, setUrl] = useState("")
   const [adding, setAdding] = useState(false)
+  const [collapseOverride, setCollapseOverride] = useState<{ revision: number; value: boolean } | null>(null)
+  const collapsed = collapseOverride?.revision === board.playback.updatedAt ? collapseOverride.value : board.playback.collapsed
+  useEffect(() => {
+    const deadline = board.timer.endsAt
+    if (!deadline || board.timer.completed) return
+    const timeout = setTimeout(() => {
+      playerRef.current?.pauseVideo()
+      setCollapseOverride({ revision: stateRef.current.board.playback.updatedAt, value: true })
+    }, Math.max(0, deadline - Date.now() - clockOffset))
+    return () => clearTimeout(timeout)
+  }, [board.timer.endsAt, board.timer.completed, clockOffset])
   // Our own volume control: the YouTube embed hides its slider at mini-player sizes.
   const [audio, setAudio] = useState(loadVolume)
 
@@ -98,17 +109,20 @@ export function MiniPlayer({ board, me, actions, clockOffset }: Props) {
         loadedRef.current = null
         return
       }
-      const position = playbackPosition(latest.playback, Date.now() + offset)
+      const serverNow = Date.now() + offset
+      const expired = Boolean(latest.timer.endsAt && !latest.timer.completed && serverNow >= latest.timer.endsAt)
+      const playing = latest.playback.playing && !expired
+      const position = playbackPosition(latest.playback, expired ? latest.timer.endsAt! : serverNow)
       const key = `${latest.currentTrack}:${track.id}`
       if (loadedRef.current !== key) {
         loadedRef.current = key
-        if (latest.playback.playing) player.loadVideoById(track.videoId, position)
+        if (playing) player.loadVideoById(track.videoId, position)
         else player.cueVideoById(track.videoId, position)
         return
       }
       if (Math.abs(player.getCurrentTime() - position) > 1) player.seekTo(position, true)
       const state = player.getPlayerState()
-      if (latest.playback.playing) {
+      if (playing) {
         if (state !== 1 && state !== 3) player.playVideo()
       } else if (state !== 2 && state !== 5) player.pauseVideo()
     }
@@ -116,7 +130,7 @@ export function MiniPlayer({ board, me, actions, clockOffset }: Props) {
     sync()
     const interval = setInterval(sync, 1000)
     return () => clearInterval(interval)
-  }, [ready, board.playback, board.currentTrack, current, clockOffset])
+  }, [ready, board.playback, board.currentTrack, board.timer, current, clockOffset])
 
   useEffect(() => {
     const player = playerRef.current
@@ -150,7 +164,14 @@ export function MiniPlayer({ board, me, actions, clockOffset }: Props) {
   const urlValid = parseYouTubeId(url) !== null
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border bg-card/70 p-3 backdrop-blur sm:flex-row">
+    <section className="rounded-2xl border bg-card/70 p-3 backdrop-blur">
+      <button type="button" className="flex w-full items-center justify-between gap-2 text-sm" aria-expanded={!collapsed}
+        aria-controls="soundtrack-content" onClick={() => setCollapseOverride({ revision: board.playback.updatedAt, value: !collapsed })}>
+        <span className="flex min-w-0 items-center gap-2"><Music2 className="size-4 shrink-0" /><span className="truncate">{current ? trackLabel(current) : t.player.nothingQueued}</span></span>
+        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">{collapsed ? t.player.expand : t.player.collapse}{collapsed ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}</span>
+      </button>
+      <div id="soundtrack-content" className={cn("mt-3 flex flex-col gap-3 sm:flex-row", collapsed && "hidden")}>
+
       <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-xl bg-black sm:w-72">
         <div ref={hostRef} className={cn("pointer-events-none absolute inset-0 [&>iframe]:size-full", !videoId && "invisible")} />
         {!videoId && (
@@ -298,6 +319,7 @@ export function MiniPlayer({ board, me, actions, clockOffset }: Props) {
             />
           </label>
         )}
+      </div>
       </div>
     </section>
   )
