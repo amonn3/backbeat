@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { Eraser, Plus } from "lucide-react"
 import type { Card, ColumnId } from "@shared/types"
 import type { BoardActions } from "@/hooks/useBoard"
@@ -32,6 +32,15 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
+  const composerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!composing) return
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !composerRef.current?.contains(event.target)) setComposing(false)
+    }
+    document.addEventListener("pointerdown", closeOutside)
+    return () => document.removeEventListener("pointerdown", closeOutside)
+  }, [composing])
   const style = COLUMN_STYLES[id]
   const itemCount = cards.reduce((n, c) => n + c.items.length, 0)
 
@@ -91,7 +100,7 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
       </header>
 
       {composing && !locked && (
-        <div className={cn("mb-2.5 rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
+        <div ref={composerRef} className={cn("mb-2.5 rounded-2xl border border-l-[3px] bg-secondary/60 p-2", style.border)}>
           <textarea
             autoFocus
             rows={3}
