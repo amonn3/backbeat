@@ -21,7 +21,7 @@ export default function HomePage() {
   const { t } = useI18n()
   const [name, setName] = useState(getSavedName)
   const [title, setTitle] = useState("")
-  const [playlistOpen, setPlaylistOpen] = useState(true)
+  const [playlistOpen, setPlaylistOpen] = useState(false)
   const [joinCode, setJoinCode] = useState("")
   const [loading, setLoading] = useState(false)
 

@@ -67,6 +67,14 @@ export function useBoard(boardId: string, name: string | null) {
     }
   }, [boardId, name, participantId])
 
+  useEffect(() => {
+    const deadline = board?.timer.endsAt
+    if (!deadline || board?.timer.completed) return
+    const expire = () => socketRef.current?.emit("timer:expire", { endsAt: deadline })
+    const timeout = setTimeout(expire, Math.max(0, deadline - Date.now() - clockOffset))
+    return () => clearTimeout(timeout)
+  }, [board?.timer.endsAt, board?.timer.completed, clockOffset])
+
   /** Emits an acked event and surfaces server-side rejections as toasts. */
   const call = useCallback((send: (socket: AppSocket, done: (res: Ack) => void) => void) => {
     const socket = socketRef.current
@@ -82,6 +90,7 @@ export function useBoard(boardId: string, name: string | null) {
   const actions = useMemo(
     () => ({
       addCard: (column: ColumnId, text: string) => call((s, d) => s.emit("card:add", { column, text }, d)),
+      moveCard: (cardId: string, column: ColumnId) => call((s, d) => s.emit("card:move", { cardId, column }, d)),
       deleteCard: (cardId: string) => call((s, d) => s.emit("card:delete", { cardId }, d)),
       mergeCards: (sourceId: string, targetId: string) =>
         call((s, d) => s.emit("card:merge", { sourceId, targetId }, d)),
@@ -90,7 +99,8 @@ export function useBoard(boardId: string, name: string | null) {
       addTrack: (url: string) => call((s, d) => s.emit("track:add", { url }, d)),
       removeTrack: (trackId: string) => call((s, d) => s.emit("track:remove", { trackId }, d)),
       playTrack: (index: number) => call((s, d) => s.emit("track:play", { index }, d)),
-      trackEnded: (index: number) => socketRef.current?.emit("track:ended", { index }),
+      setPlayback: (playing: boolean) => call((s, d) => s.emit("playback:set", { playing }, d)),
+      trackEnded: (index: number, updatedAt: number) => socketRef.current?.emit("track:ended", { index, updatedAt }),
       nameTrack: (trackId: string, title: string) => socketRef.current?.emit("track:title", { trackId, title }),
       startTimer: (durationSec: number) => call((s, d) => s.emit("timer:start", { durationSec }, d)),
       pauseTimer: () => call((s, d) => s.emit("timer:pause", d)),

@@ -20,6 +20,7 @@ export type ErrorCode =
   | "clear_host_only"
   | "invalid_youtube"
   | "playlist_host_only"
+  | "playback_host_only"
   | "track_not_found"
   | "timer_host_only"
   | "timer_range"
@@ -64,6 +65,7 @@ export interface Participant {
 }
 
 export interface TimerState {
+  completed?: boolean
   durationSec: number
   /** Epoch ms when the countdown hits zero; null while stopped or paused. */
   endsAt: number | null
@@ -76,6 +78,17 @@ export interface BoardSettings {
   playlistOpen: boolean
 }
 
+export interface PlaybackState {
+  collapsed: boolean
+  playing: boolean
+  positionSec: number
+  updatedAt: number
+}
+
+export function playbackPosition(playback: PlaybackState, now: number) {
+  return playback.positionSec + (playback.playing ? Math.max(0, now - playback.updatedAt) / 1000 : 0)
+}
+
 export interface Board {
   id: string
   title: string
@@ -86,6 +99,7 @@ export interface Board {
   participants: Record<string, Participant>
   cards: Card[]
   playlist: Track[]
+  playback: PlaybackState
   currentTrack: number
   timer: TimerState
 }
@@ -110,6 +124,7 @@ export interface ClientToServerEvents {
     ack: (res: { ok: true; snapshot: BoardSnapshot } | { ok: false; error: ErrorCode }) => void,
   ) => void
   "card:add": (payload: { column: ColumnId; text: string }, ack: (res: Ack) => void) => void
+  "card:move": (payload: { cardId: string; column: ColumnId }, ack: (res: Ack) => void) => void
   "card:delete": (payload: { cardId: string }, ack: (res: Ack) => void) => void
   "card:merge": (payload: { sourceId: string; targetId: string }, ack: (res: Ack) => void) => void
   "card:split": (payload: { cardId: string }, ack: (res: Ack) => void) => void
@@ -117,9 +132,11 @@ export interface ClientToServerEvents {
   "track:add": (payload: { url: string }, ack: (res: Ack) => void) => void
   "track:remove": (payload: { trackId: string }, ack: (res: Ack) => void) => void
   "track:play": (payload: { index: number }, ack: (res: Ack) => void) => void
-  "track:ended": (payload: { index: number }) => void
+  "playback:set": (payload: { playing: boolean }, ack: (res: Ack) => void) => void
+  "track:ended": (payload: { index: number; updatedAt: number }) => void
   "presence:ping": () => void
   "track:title": (payload: { trackId: string; title: string }) => void
+  "timer:expire": (payload: { endsAt: number }) => void
   "timer:start": (payload: { durationSec: number }, ack: (res: Ack) => void) => void
   "timer:pause": (ack: (res: Ack) => void) => void
   "timer:resume": (ack: (res: Ack) => void) => void

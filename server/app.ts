@@ -12,6 +12,7 @@ import {
   canManagePlaylist,
   isPlaceholderTitle,
   parseYouTubeId,
+  playbackPosition,
   type Ack,
   type Board,
   type ClientToServerEvents,
@@ -63,12 +64,29 @@ const OK: Ack = { ok: true }
 const fail = (error: ErrorCode): Ack => ({ ok: false, error })
 const isHost = (board: Board, id: string) => board.hostId === id
 
+/** Settle against the deadline, even if every browser was asleep at zero. */
+function expireTimer(board: Board) {
+  const deadline = board.timer.endsAt
+  if (!deadline || board.timer.completed || Date.now() < deadline) return false
+  board.playback ??= { collapsed: false, playing: false, positionSec: 0, updatedAt: deadline }
+  board.playback = {
+    collapsed: true,
+    playing: false,
+    positionSec: playbackPosition(board.playback, deadline),
+    updatedAt: deadline,
+  }
+  board.timer.completed = true
+  board.timer.remainingMs = 0
+  return true
+}
+
 /**
  * Presence lives in the store, refreshed by client pings. Asking the other
  * instances (fetchSockets) is unreliable on Vercel: suspended instances keep
  * their Redis subscription but never answer, so every call would time out.
  */
 async function withPresence(board: Board) {
+  board.playback ??= { collapsed: false, playing: false, positionSec: 0, updatedAt: Date.now() }
   const online = await store.onlineParticipants(board.id)
   for (const p of Object.values(board.participants)) p.online = online.has(p.id)
   return { board, serverTime: Date.now() }
@@ -92,15 +110,17 @@ async function withBoard(
   if (!boardId || !participantId) return fail("not_in_board")
   try {
     const res = await store.mutate(boardId, (board) => {
+      const expired = expireTimer(board)
       if (board.finishedAt && !opts.allowWhenFinished) {
-        return { commit: false, result: fail("board_finished") }
+        return { commit: expired, result: { ack: fail("board_finished"), changed: expired } }
       }
+      board.playback ??= { collapsed: false, playing: false, positionSec: 0, updatedAt: Date.now() }
       const result = handler(board, participantId)
-      return { commit: result.ok, result }
+      return { commit: result.ok || expired, result: { ack: result, changed: result.ok || expired } }
     })
     if (!res) return fail("board_not_found")
-    if (res.result.ok) await broadcast(res.board)
-    return res.result
+    if (res.result.changed) await broadcast(res.board)
+    return res.result.ack
   } catch (err) {
     console.error("[board]", err)
     return fail(err instanceof Error && err.message === "too_many_changes" ? "too_many_changes" : "unexpected")
@@ -166,6 +186,7 @@ app.post("/api/boards", async (req, res) => {
     participants: { [hostId]: { id: hostId, name: hostName, online: false, joinedAt: now } },
     cards: [],
     playlist: [],
+    playback: { collapsed: false, playing: false, positionSec: 0, updatedAt: now },
     currentTrack: 0,
     timer: { durationSec: 5 * 60, endsAt: null, remainingMs: 5 * 60 * 1000 },
   }
@@ -195,6 +216,7 @@ io.on("connection", (socket: AppSocket) => {
     if (!cleanName || !participantId) return ack({ ok: false, error: "name_required" })
     try {
       const res = await store.mutate(boardId, (board) => {
+        const expired = expireTimer(board)
         const existing = board.participants[participantId]
         board.participants[participantId] = {
           id: participantId,
@@ -202,7 +224,7 @@ io.on("connection", (socket: AppSocket) => {
           online: true,
           joinedAt: existing?.joinedAt ?? Date.now(),
         }
-        return { commit: existing?.name !== cleanName, result: null }
+        return { commit: expired || existing?.name !== cleanName, result: null }
       })
       if (!res) return ack({ ok: false, error: "board_not_found" })
       socket.data = { boardId, participantId }
@@ -218,7 +240,14 @@ io.on("connection", (socket: AppSocket) => {
 
   socket.on("presence:ping", async () => {
     const { boardId, participantId } = socket.data
-    if (boardId && participantId) await store.touchPresence(boardId, socket.id, participantId).catch(() => {})
+    if (boardId && participantId) {
+      await store.touchPresence(boardId, socket.id, participantId).catch(() => {})
+      const result = await store.mutate(boardId, (board) => {
+        const expired = expireTimer(board)
+        return { commit: expired, result: expired }
+      }).catch(() => undefined)
+      if (result?.result) await broadcast(result.board)
+    }
   })
 
   socket.on("disconnect", async () => {
@@ -257,6 +286,16 @@ io.on("connection", (socket: AppSocket) => {
         return OK
       }),
     ),
+  )
+
+  socket.on("card:move", async ({ cardId, column }, ack) =>
+    ack(await withBoard(socket, (board) => {
+      if (!COLUMNS.includes(column)) return fail("invalid_column")
+      const card = board.cards.find((c) => c.id === cardId)
+      if (!card) return fail("card_not_found")
+      card.column = column
+      return OK
+    })),
   )
 
   socket.on("card:delete", async ({ cardId }, ack) =>
@@ -369,9 +408,12 @@ io.on("connection", (socket: AppSocket) => {
           if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
           const index = board.playlist.findIndex((t) => t.id === trackId)
           if (index === -1) return fail("track_not_found")
+          if (index === board.currentTrack && !isHost(board, me)) return fail("playback_host_only")
+          const removingCurrent = index === board.currentTrack
           board.playlist.splice(index, 1)
           if (index < board.currentTrack) board.currentTrack--
           board.currentTrack = Math.min(board.currentTrack, Math.max(board.playlist.length - 1, 0))
+          if (removingCurrent) board.playback = { collapsed: false, playing: false, positionSec: 0, updatedAt: Date.now() }
           return OK
         },
         { allowWhenFinished: true },
@@ -384,11 +426,12 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
+          if (!isHost(board, me)) return fail("playback_host_only")
           if (!Number.isInteger(index) || index < 0 || index >= board.playlist.length) {
             return fail("track_not_found")
           }
           board.currentTrack = index
+          board.playback = { collapsed: false, playing: true, positionSec: 0, updatedAt: Date.now() }
           return OK
         },
         { allowWhenFinished: true },
@@ -396,18 +439,39 @@ io.on("connection", (socket: AppSocket) => {
     ),
   )
 
-  // Every client reports the end of a track; only the first report for the
-  // current index advances, so the queue moves exactly once.
-  socket.on("track:ended", async ({ index }) => {
-    await withBoard(
-      socket,
-      (board) => {
-        if (index !== board.currentTrack || index >= board.playlist.length - 1) return fail("noop")
+  socket.on("playback:set", async ({ playing }, ack) =>
+    ack(await withBoard(socket, (board, me) => {
+      if (!isHost(board, me)) return fail("playback_host_only")
+      if (typeof playing !== "boolean" || !board.playlist[board.currentTrack]) return fail("track_not_found")
+      const now = Date.now()
+      board.playback = { collapsed: false, playing, positionSec: playbackPosition(board.playback, now), updatedAt: now }
+      return OK
+    }, { allowWhenFinished: true })),
+  )
+
+  // Only the host advances the queue; the playback revision rejects stale end events.
+  socket.on("track:ended", async ({ index, updatedAt }) => {
+    await withBoard(socket, (board, me) => {
+      if (!isHost(board, me) || !board.playback.playing || index !== board.currentTrack || updatedAt !== board.playback.updatedAt) return fail("noop")
+      if (index < board.playlist.length - 1) {
         board.currentTrack++
-        return OK
-      },
-      { allowWhenFinished: true },
-    )
+        board.playback = { collapsed: false, playing: true, positionSec: 0, updatedAt: Date.now() }
+      } else {
+        board.playback = { collapsed: false, playing: false, positionSec: 0, updatedAt: Date.now() }
+      }
+      return OK
+    }, { allowWhenFinished: true })
+  })
+
+  // Any participant can report zero; only the server deadline can expire it.
+  socket.on("timer:expire", async ({ endsAt }) => {
+    const { boardId } = socket.data
+    if (!boardId) return
+    const result = await store.mutate(boardId, (board) => {
+      const expired = board.timer.endsAt === endsAt && expireTimer(board)
+      return { commit: expired, result: expired }
+    }).catch(() => undefined)
+    if (result?.result) await broadcast(result.board)
   })
 
   socket.on("timer:start", async ({ durationSec }, ack) =>
@@ -449,7 +513,7 @@ io.on("connection", (socket: AppSocket) => {
     ack(
       await withBoard(socket, (board, me) => {
         if (!isHost(board, me)) return fail("timer_host_only")
-        board.timer = { ...board.timer, endsAt: null, remainingMs: board.timer.durationSec * 1000 }
+        board.timer = { ...board.timer, completed: false, endsAt: null, remainingMs: board.timer.durationSec * 1000 }
         return OK
       }),
     ),

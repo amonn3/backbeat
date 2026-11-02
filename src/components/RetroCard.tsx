@@ -92,7 +92,7 @@ export function RetroCard(props: Props) {
 
   const activeColumn = (active?.data.current as CardDragData | undefined)?.column
   const isMergeTarget = drop.isOver && active?.id !== card.id && activeColumn === card.column
-  const isInvalidTarget = drop.isOver && active?.id !== card.id && activeColumn !== card.column
+  const isMoveTarget = drop.isOver && active?.id !== card.id && activeColumn !== card.column
 
   return (
     <div
@@ -109,7 +109,7 @@ export function RetroCard(props: Props) {
         !locked && "cursor-grab hover:-translate-y-0.5 hover:bg-secondary",
         drag.isDragging && "opacity-30",
         isMergeTarget && "scale-[1.02] ring-2 ring-primary",
-        isInvalidTarget && "ring-2 ring-destructive/50",
+        isMoveTarget && "ring-2 ring-primary/50",
       )}
     >
       <CardBody {...props} />
