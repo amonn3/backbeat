@@ -29,7 +29,7 @@ interface Props {
 }
 
 export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: Props) {
-  const drop = useDroppable({ id: `column:${id}`, data: { column: id }, disabled: locked })
+  const { setNodeRef, isOver } = useDroppable({ id: `column:${id}`, data: { column: id }, disabled: locked })
   const { t } = useI18n()
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState("")
@@ -65,11 +65,11 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
 
   return (
     <section
-      ref={drop.setNodeRef}
+      ref={setNodeRef}
       className={cn(
         "flex min-h-80 flex-col rounded-2xl border bg-gradient-to-b to-card/40 to-40% p-3 md:min-h-0",
         style.glow,
-        drop.isOver && "ring-2 ring-primary/50",
+        isOver && "ring-2 ring-primary/50",
       )}
     >
       <header className="mb-3 flex items-center gap-2 px-1">
