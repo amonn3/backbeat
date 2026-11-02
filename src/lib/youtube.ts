@@ -1,7 +1,12 @@
 /** Minimal typing for the bits of the YouTube IFrame API we use. */
 export interface YTPlayer {
-  loadVideoById(id: string): void
-  cueVideoById(id: string): void
+  loadVideoById(id: string, startSeconds?: number): void
+  cueVideoById(id: string, startSeconds?: number): void
+  playVideo(): void
+  pauseVideo(): void
+  seekTo(seconds: number, allowSeekAhead: boolean): void
+  getCurrentTime(): number
+  getPlayerState(): number
   stopVideo(): void
   destroy(): void
   getVideoData(): { title?: string; video_id?: string }
@@ -18,7 +23,7 @@ interface YTNamespace {
       width?: string
       height?: string
       playerVars?: Record<string, number | string>
-      events?: { onStateChange?: (e: { data: number }) => void; onReady?: () => void }
+      events?: { onStateChange?: (e: { data: number }) => void; onReady?: () => void; onAutoplayBlocked?: () => void }
     },
   ) => YTPlayer
   PlayerState: { ENDED: number; PLAYING: number; CUED: number }

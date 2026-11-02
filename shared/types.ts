@@ -20,6 +20,7 @@ export type ErrorCode =
   | "clear_host_only"
   | "invalid_youtube"
   | "playlist_host_only"
+  | "playback_host_only"
   | "track_not_found"
   | "timer_host_only"
   | "timer_range"
@@ -76,6 +77,16 @@ export interface BoardSettings {
   playlistOpen: boolean
 }
 
+export interface PlaybackState {
+  playing: boolean
+  positionSec: number
+  updatedAt: number
+}
+
+export function playbackPosition(playback: PlaybackState, now: number) {
+  return playback.positionSec + (playback.playing ? Math.max(0, now - playback.updatedAt) / 1000 : 0)
+}
+
 export interface Board {
   id: string
   title: string
@@ -86,6 +97,7 @@ export interface Board {
   participants: Record<string, Participant>
   cards: Card[]
   playlist: Track[]
+  playback: PlaybackState
   currentTrack: number
   timer: TimerState
 }
@@ -118,7 +130,8 @@ export interface ClientToServerEvents {
   "track:add": (payload: { url: string }, ack: (res: Ack) => void) => void
   "track:remove": (payload: { trackId: string }, ack: (res: Ack) => void) => void
   "track:play": (payload: { index: number }, ack: (res: Ack) => void) => void
-  "track:ended": (payload: { index: number }) => void
+  "playback:set": (payload: { playing: boolean }, ack: (res: Ack) => void) => void
+  "track:ended": (payload: { index: number; updatedAt: number }) => void
   "presence:ping": () => void
   "track:title": (payload: { trackId: string; title: string }) => void
   "timer:start": (payload: { durationSec: number }, ack: (res: Ack) => void) => void

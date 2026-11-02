@@ -208,7 +208,7 @@ export default function BoardPage() {
         </div>
       )}
 
-      <MiniPlayer board={board} me={participantId} actions={actions} />
+      <MiniPlayer board={board} me={participantId} actions={actions} clockOffset={clockOffset} />
       <RetroTimer board={board} isHost={isHost} clockOffset={clockOffset} actions={actions} />
 
       <DndContext

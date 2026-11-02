@@ -12,6 +12,7 @@ import {
   canManagePlaylist,
   isPlaceholderTitle,
   parseYouTubeId,
+  playbackPosition,
   type Ack,
   type Board,
   type ClientToServerEvents,
@@ -69,6 +70,7 @@ const isHost = (board: Board, id: string) => board.hostId === id
  * their Redis subscription but never answer, so every call would time out.
  */
 async function withPresence(board: Board) {
+  board.playback ??= { playing: false, positionSec: 0, updatedAt: Date.now() }
   const online = await store.onlineParticipants(board.id)
   for (const p of Object.values(board.participants)) p.online = online.has(p.id)
   return { board, serverTime: Date.now() }
@@ -95,6 +97,7 @@ async function withBoard(
       if (board.finishedAt && !opts.allowWhenFinished) {
         return { commit: false, result: fail("board_finished") }
       }
+      board.playback ??= { playing: false, positionSec: 0, updatedAt: Date.now() }
       const result = handler(board, participantId)
       return { commit: result.ok, result }
     })
@@ -166,6 +169,7 @@ app.post("/api/boards", async (req, res) => {
     participants: { [hostId]: { id: hostId, name: hostName, online: false, joinedAt: now } },
     cards: [],
     playlist: [],
+    playback: { playing: false, positionSec: 0, updatedAt: now },
     currentTrack: 0,
     timer: { durationSec: 5 * 60, endsAt: null, remainingMs: 5 * 60 * 1000 },
   }
@@ -379,9 +383,12 @@ io.on("connection", (socket: AppSocket) => {
           if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
           const index = board.playlist.findIndex((t) => t.id === trackId)
           if (index === -1) return fail("track_not_found")
+          if (index === board.currentTrack && !isHost(board, me)) return fail("playback_host_only")
+          const removingCurrent = index === board.currentTrack
           board.playlist.splice(index, 1)
           if (index < board.currentTrack) board.currentTrack--
           board.currentTrack = Math.min(board.currentTrack, Math.max(board.playlist.length - 1, 0))
+          if (removingCurrent) board.playback = { playing: false, positionSec: 0, updatedAt: Date.now() }
           return OK
         },
         { allowWhenFinished: true },
@@ -394,11 +401,12 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(
         socket,
         (board, me) => {
-          if (!canManagePlaylist(board, me)) return fail("playlist_host_only")
+          if (!isHost(board, me)) return fail("playback_host_only")
           if (!Number.isInteger(index) || index < 0 || index >= board.playlist.length) {
             return fail("track_not_found")
           }
           board.currentTrack = index
+          board.playback = { playing: true, positionSec: 0, updatedAt: Date.now() }
           return OK
         },
         { allowWhenFinished: true },
@@ -406,18 +414,28 @@ io.on("connection", (socket: AppSocket) => {
     ),
   )
 
-  // Every client reports the end of a track; only the first report for the
-  // current index advances, so the queue moves exactly once.
-  socket.on("track:ended", async ({ index }) => {
-    await withBoard(
-      socket,
-      (board) => {
-        if (index !== board.currentTrack || index >= board.playlist.length - 1) return fail("noop")
+  socket.on("playback:set", async ({ playing }, ack) =>
+    ack(await withBoard(socket, (board, me) => {
+      if (!isHost(board, me)) return fail("playback_host_only")
+      if (typeof playing !== "boolean" || !board.playlist[board.currentTrack]) return fail("track_not_found")
+      const now = Date.now()
+      board.playback = { playing, positionSec: playbackPosition(board.playback, now), updatedAt: now }
+      return OK
+    }, { allowWhenFinished: true })),
+  )
+
+  // Only the host advances the queue; the playback revision rejects stale end events.
+  socket.on("track:ended", async ({ index, updatedAt }) => {
+    await withBoard(socket, (board, me) => {
+      if (!isHost(board, me) || !board.playback.playing || index !== board.currentTrack || updatedAt !== board.playback.updatedAt) return fail("noop")
+      if (index < board.playlist.length - 1) {
         board.currentTrack++
-        return OK
-      },
-      { allowWhenFinished: true },
-    )
+        board.playback = { playing: true, positionSec: 0, updatedAt: Date.now() }
+      } else {
+        board.playback = { playing: false, positionSec: 0, updatedAt: Date.now() }
+      }
+      return OK
+    }, { allowWhenFinished: true })
   })
 
   socket.on("timer:start", async ({ durationSec }, ack) =>
