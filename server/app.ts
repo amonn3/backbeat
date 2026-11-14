@@ -9,6 +9,8 @@ import { Server, type Socket } from "socket.io"
 import {
   COLUMNS,
   PLACEHOLDER_TITLE,
+  boardFor,
+  cardsRevealed,
   canManagePlaylist,
   isPlaceholderTitle,
   parseYouTubeId,
@@ -92,8 +94,21 @@ async function withPresence(board: Board) {
   return { board, serverTime: Date.now() }
 }
 
+/** Each participant's sockets share a room, so hidden cards can be filtered per viewer. */
+const participantRoom = (boardId: string, participantId: string) => `${boardId}:p:${participantId}`
+
 async function broadcast(board: Board) {
-  io.to(board.id).emit("board:state", await withPresence(board))
+  const snapshot = await withPresence(board)
+  if (cardsRevealed(board)) {
+    io.to(board.id).emit("board:state", snapshot)
+    return
+  }
+  for (const participantId of Object.keys(board.participants)) {
+    io.to(participantRoom(board.id, participantId)).emit("board:state", {
+      ...snapshot,
+      board: boardFor(snapshot.board, participantId),
+    })
+  }
 }
 
 /**
@@ -182,6 +197,7 @@ app.post("/api/boards", async (req, res) => {
     hostId,
     createdAt: now,
     finishedAt: null,
+    cardsRevealed: false,
     settings: { playlistOpen: Boolean(body.playlistOpen) },
     participants: { [hostId]: { id: hostId, name: hostName, online: false, joinedAt: now } },
     cards: [],
@@ -228,9 +244,10 @@ io.on("connection", (socket: AppSocket) => {
       })
       if (!res) return ack({ ok: false, error: "board_not_found" })
       socket.data = { boardId, participantId }
-      await socket.join(boardId)
+      await socket.join([boardId, participantRoom(boardId, participantId)])
       await store.touchPresence(boardId, socket.id, participantId)
-      ack({ ok: true, snapshot: await withPresence(res.board) })
+      const snapshot = await withPresence(res.board)
+      ack({ ok: true, snapshot: { ...snapshot, board: boardFor(snapshot.board, participantId) } })
       await broadcast(res.board)
     } catch (err) {
       console.error("[join]", err)
@@ -538,6 +555,8 @@ io.on("connection", (socket: AppSocket) => {
       await withBoard(socket, (board, me) => {
         if (!isHost(board, me)) return fail("finish_host_only")
         board.finishedAt = Date.now()
+        // The report is built from what each browser sees, so nothing stays hidden after the end.
+        board.cardsRevealed = true
         if (board.timer.endsAt) {
           board.timer.remainingMs = Math.max(board.timer.endsAt - Date.now(), 0)
           board.timer.endsAt = null
@@ -558,6 +577,17 @@ io.on("connection", (socket: AppSocket) => {
         },
         { allowWhenFinished: true },
       ),
+    ),
+  )
+
+  socket.on("cards:reveal", async (ack) =>
+    ack(
+      await withBoard(socket, (board, me) => {
+        if (!isHost(board, me)) return fail("reveal_host_only")
+        if (cardsRevealed(board)) return fail("already_revealed")
+        board.cardsRevealed = true
+        return OK
+      }),
     ),
   )
 })

@@ -106,3 +106,66 @@
     scrollbar-color: oklch(1 0 0 / 14%) transparent;
   }
 }
+
+/* Hidden cards: a soft shimmer over placeholder lines. */
+@keyframes card-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.card-redacted-line {
+  background: linear-gradient(90deg, oklch(1 0 0 / 7%) 0%, oklch(1 0 0 / 16%) 50%, oklch(1 0 0 / 7%) 100%);
+  background-size: 200% 100%;
+  animation: card-shimmer 2.4s linear infinite;
+}
+
+/* Reveal: each card flips in from blur, then a light sweep crosses it. */
+@keyframes card-reveal {
+  0% { transform: perspective(900px) rotateX(-75deg) scale(0.94); filter: blur(8px); opacity: 0.2; }
+  55% { transform: perspective(900px) rotateX(10deg) scale(1.03); filter: blur(0); opacity: 1; }
+  100% { transform: none; filter: none; opacity: 1; }
+}
+@keyframes card-reveal-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.7 0.17 290 / 0); }
+  45% { box-shadow: 0 0 0 2px oklch(0.7 0.17 290 / 70%), 0 0 36px 4px oklch(0.7 0.17 290 / 45%); }
+}
+@keyframes card-reveal-sheen {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(220%) skewX(-20deg); }
+}
+@keyframes reveal-flash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.card-revealing {
+  overflow: hidden;
+  animation:
+    card-reveal 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.15) both,
+    card-reveal-glow 1.4s ease-out both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+.card-revealing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 22%), transparent);
+  animation: card-reveal-sheen 0.9s ease-out both;
+  animation-delay: calc(var(--reveal-delay, 0ms) + 250ms);
+}
+.reveal-flash {
+  background:
+    radial-gradient(40rem 22rem at 50% 45%, oklch(0.7 0.17 290 / 22%), transparent 70%),
+    radial-gradient(30rem 18rem at 20% 80%, oklch(0.65 0.12 240 / 14%), transparent 70%);
+  animation: reveal-flash 1.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-redacted-line,
+  .card-revealing,
+  .card-revealing::after,
+  .reveal-flash {
+    animation: none;
+  }
+}

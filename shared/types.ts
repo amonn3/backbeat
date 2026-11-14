@@ -29,6 +29,8 @@ export type ErrorCode =
   | "settings_host_only"
   | "finish_host_only"
   | "reopen_host_only"
+  | "reveal_host_only"
+  | "already_revealed"
   | "too_many_changes"
   | "create_failed"
   | "unexpected"
@@ -40,6 +42,8 @@ export interface CardItem {
   authorId: string
   authorName: string
   createdAt: number
+  /** Set on items the viewer may not see yet: text and author arrive blank. */
+  hidden?: true
 }
 
 /** A card holds one item, or several once cards are merged together. */
@@ -95,6 +99,11 @@ export interface Board {
   hostId: string
   createdAt: number
   finishedAt: number | null
+  /**
+   * While false only the host and each card's author see its content.
+   * Boards saved before this flag existed are treated as revealed.
+   */
+  cardsRevealed?: boolean
   settings: BoardSettings
   participants: Record<string, Participant>
   cards: Card[]
@@ -144,6 +153,7 @@ export interface ClientToServerEvents {
   "settings:update": (payload: Partial<BoardSettings>, ack: (res: Ack) => void) => void
   "board:finish": (ack: (res: Ack) => void) => void
   "board:reopen": (ack: (res: Ack) => void) => void
+  "cards:reveal": (ack: (res: Ack) => void) => void
 }
 
 export interface ServerToClientEvents {
@@ -152,6 +162,29 @@ export interface ServerToClientEvents {
 
 export function canManagePlaylist(board: Board, participantId: string) {
   return board.hostId === participantId || board.settings.playlistOpen
+}
+
+export function cardsRevealed(board: Board) {
+  return board.cardsRevealed !== false
+}
+
+/**
+ * The board as one participant may see it. Before the reveal, items written
+ * by someone else lose their text and author; the host always sees everything.
+ */
+export function boardFor(board: Board, viewerId: string): Board {
+  if (cardsRevealed(board) || board.hostId === viewerId) return board
+  return {
+    ...board,
+    cards: board.cards.map((card) => ({
+      ...card,
+      items: card.items.map((item) =>
+        item.authorId === viewerId
+          ? item
+          : { id: item.id, text: "", authorId: "", authorName: "", createdAt: item.createdAt, hidden: true as const },
+      ),
+    })),
+  }
 }
 
 export const PLACEHOLDER_TITLE = "Vídeo do YouTube"

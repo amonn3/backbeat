@@ -25,10 +25,13 @@ interface Props {
   me: string
   isHost: boolean
   locked: boolean
+  concealed: boolean
+  /** Index of this column's first card in the board-wide reveal stagger, or null when not revealing. */
+  revealFrom: number | null
   actions: BoardActions
 }
 
-export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: Props) {
+export function RetroColumn({ id, title, cards, me, isHost, locked, concealed, revealFrom, actions }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: `column:${id}`, data: { column: id }, disabled: locked })
   const { t } = useI18n()
   const [composing, setComposing] = useState(false)
@@ -138,11 +141,15 @@ export function RetroColumn({ id, title, cards, me, isHost, locked, actions }: P
 
       {/* Only the card list scrolls, so a long column never stretches the page. */}
       <div className="scroll-thin -mx-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-1 py-1">
-        {cards.map((card) => (
+        {cards.map((card, index) => (
           <RetroCard
             key={card.id}
             card={card}
             accent={style.border}
+            me={me}
+            concealed={concealed}
+            revealing={revealFrom !== null}
+            revealDelay={revealFrom === null ? 0 : Math.min((revealFrom + index) * 70, 1200)}
             locked={locked}
             canDelete={isHost || card.items.every((i) => i.authorId === me)}
             onDelete={() => actions.deleteCard(card.id)}

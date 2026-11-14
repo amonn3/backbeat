@@ -58,6 +58,11 @@ export const en: Dict = {
       "Cards get locked for everyone and the Markdown report becomes available to download. You can reopen it later if needed.",
     cancel: "Cancel",
     finishConfirm: "End and generate report",
+    reveal: "Reveal cards",
+    hiddenHost: "Only you can see every card's content",
+    hiddenGuest: "Cards stay hidden until the host reveals them",
+    revealedToast: "Cards revealed!",
+    revealedToastDescription: "Everyone can now see each card and who wrote it.",
   },
 
   columns: {
@@ -87,6 +92,9 @@ export const en: Dict = {
     split: "Ungroup",
     remove: "Remove card",
     dropToMerge: "Drop to group",
+    hidden: "Hidden card",
+    onlyYou: "Only you can see this",
+    hiddenForTeam: "Hidden from the team",
   },
 
   player: {
@@ -182,6 +190,8 @@ export const en: Dict = {
     settings_host_only: "Only the host can change settings.",
     finish_host_only: "Only the host can end the retro.",
     reopen_host_only: "Only the host can reopen the retro.",
+    reveal_host_only: "Only the host can reveal the cards.",
+    already_revealed: "The cards were already revealed.",
     too_many_changes: "Too many simultaneous changes, try again.",
     create_failed: "Couldn't create the board.",
     unexpected: "Something went wrong. Try again.",

@@ -151,3 +151,45 @@ test("timer expiration pauses and collapses once, rejects early reports, and sur
   assert.equal(later.state().board.playback.playing, false)
   assert.equal(later.state().board.playback.collapsed, true)
 })
+
+test("cards stay hidden from other guests until the host reveals them", async () => {
+  const { id, host, guest } = await setup()
+  const other = await join(id, "other")
+  await guest.socket.timeout(3000).emitWithAck("card:add", { column: "good", text: "Guest secret" })
+  await other.socket.timeout(3000).emitWithAck("card:add", { column: "good", text: "Other secret" })
+  await waitFor(() => host.state().board.cards.length === 2 && guest.state().board.cards.length === 2)
+
+  // The host sees everything; each guest sees only their own text.
+  assert.deepEqual(host.state().board.cards.map((c) => c.items[0].text), ["Guest secret", "Other secret"])
+  const [mine, theirs] = guest.state().board.cards
+  assert.equal(mine.items[0].text, "Guest secret")
+  assert.equal(mine.items[0].hidden, undefined)
+  assert.deepEqual(theirs.items[0], { id: theirs.items[0].id, text: "", authorId: "", authorName: "", createdAt: theirs.items[0].createdAt, hidden: true })
+  assert.ok(!JSON.stringify(guest.state()).includes("Other secret"))
+
+  // Merged cards keep hiding the items the viewer did not write.
+  await guest.socket.timeout(3000).emitWithAck("card:merge", { sourceId: theirs.id, targetId: mine.id })
+  await waitFor(() => guest.state().board.cards.length === 1)
+  assert.deepEqual(guest.state().board.cards[0].items.map((i) => i.text), ["Guest secret", ""])
+
+  // A late joiner gets the filtered snapshot in the join ack too.
+  const late = await join(id, "late")
+  assert.ok(!JSON.stringify(late.state()).includes("secret"))
+
+  assert.deepEqual(await guest.socket.timeout(3000).emitWithAck("cards:reveal"), { ok: false, error: "reveal_host_only" })
+  assert.deepEqual(await host.socket.timeout(3000).emitWithAck("cards:reveal"), { ok: true })
+  await waitFor(() => other.state().board.cardsRevealed === true)
+  assert.deepEqual(other.state().board.cards[0].items.map((i) => i.text), ["Guest secret", "Other secret"])
+  assert.equal(other.state().board.cards[0].items[0].authorName, "guest")
+  assert.deepEqual(await host.socket.timeout(3000).emitWithAck("cards:reveal"), { ok: false, error: "already_revealed" })
+})
+
+test("finishing a retro reveals hidden cards for the report", async () => {
+  const { host, guest } = await setup()
+  await host.socket.timeout(3000).emitWithAck("card:add", { column: "bad", text: "Host only" })
+  await waitFor(() => guest.state().board.cards.length === 1)
+  assert.equal(guest.state().board.cards[0].items[0].hidden, true)
+  await host.socket.timeout(3000).emitWithAck("board:finish")
+  await waitFor(() => guest.state().board.finishedAt !== null)
+  assert.equal(guest.state().board.cards[0].items[0].text, "Host only")
+})
