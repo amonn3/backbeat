@@ -58,6 +58,11 @@ export const pt = {
       "Os cards ficam bloqueados para todos e o relatório em Markdown fica disponível para download. Você pode reabrir depois, se precisar.",
     cancel: "Cancelar",
     finishConfirm: "Encerrar e gerar relatório",
+    reveal: "Revelar cards",
+    hiddenHost: "Só você vê o conteúdo de todos os cards",
+    hiddenGuest: "Cards ocultos até o host revelar",
+    revealedToast: "Cards revelados!",
+    revealedToastDescription: "Agora todo mundo vê o conteúdo e quem escreveu cada card.",
   },
 
   columns: {
@@ -87,6 +92,9 @@ export const pt = {
     split: "Desagrupar",
     remove: "Remover card",
     dropToMerge: "Soltar para agrupar",
+    hidden: "Card oculto",
+    onlyYou: "Só você vê",
+    hiddenForTeam: "Oculto para o time",
   },
 
   player: {
@@ -182,6 +190,8 @@ export const pt = {
     settings_host_only: "Só o host altera as configurações.",
     finish_host_only: "Só o host pode encerrar a retro.",
     reopen_host_only: "Só o host pode reabrir a retro.",
+    reveal_host_only: "Só o host pode revelar os cards.",
+    already_revealed: "Os cards já foram revelados.",
     too_many_changes: "Muitas alterações simultâneas, tente de novo.",
     create_failed: "Não foi possível criar o board.",
     unexpected: "Algo deu errado. Tente de novo.",

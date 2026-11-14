@@ -109,6 +109,7 @@ export function useBoard(boardId: string, name: string | null) {
       updateSettings: (patch: Partial<BoardSettings>) => call((s, d) => s.emit("settings:update", patch, d)),
       finish: () => call((s, d) => s.emit("board:finish", d)),
       reopen: () => call((s, d) => s.emit("board:reopen", d)),
+      revealCards: () => call((s, d) => s.emit("cards:reveal", d)),
     }),
     [call],
   )

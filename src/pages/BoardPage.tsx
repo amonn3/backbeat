@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
   DndContext,
@@ -12,9 +12,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import { Crown, FileText, Flag, Link2, Loader2, RotateCcw } from "lucide-react"
+import { Crown, Eye, EyeOff, FileText, Flag, Link2, Loader2, RotateCcw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
-import { COLUMNS } from "@shared/types"
+import { COLUMNS, cardsRevealed } from "@shared/types"
 import { Avatar } from "@/components/Avatar"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { Logo } from "@/components/Logo"
@@ -50,6 +50,24 @@ export default function BoardPage() {
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [preview, setPreview] = useState<{ title?: string; missing?: boolean }>({})
+  const [revealing, setRevealing] = useState(false)
+  const revealed = board ? cardsRevealed(board) : null
+  const wasRevealed = useRef(revealed)
+
+  // Plays the reveal effect only on the live transition, not when joining an already revealed board.
+  useEffect(() => {
+    const before = wasRevealed.current
+    wasRevealed.current = revealed
+    if (before !== false || revealed !== true || board?.finishedAt) return
+    setRevealing(true)
+    toast(t.board.revealedToast, {
+      description: t.board.revealedToastDescription,
+      icon: <Sparkles className="size-4 text-primary" />,
+    })
+    const done = setTimeout(() => setRevealing(false), 2400)
+    return () => clearTimeout(done)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire only when `revealed` flips
+  }, [revealed])
 
   // Lets the name dialog show which retro you were invited to, and catches bad links early.
   useEffect(() => {
@@ -113,6 +131,12 @@ export default function BoardPage() {
   )
   const onlineCount = participants.filter((p) => p.online).length
   const dragCard = dragId ? board.cards.find((c) => c.id === dragId) : undefined
+  const concealed = !cardsRevealed(board)
+  const revealStart: Partial<Record<(typeof COLUMNS)[number], number>> = {}
+  COLUMNS.reduce((offset, id) => {
+    revealStart[id] = offset
+    return offset + board.cards.filter((c) => c.column === id).length
+  }, 0)
 
   function onDragStart(e: DragStartEvent) {
     setDragId(String(e.active.id))
@@ -191,9 +215,16 @@ export default function BoardPage() {
             </>
           ) : (
             isHost && (
-              <Button onClick={() => setConfirmFinish(true)}>
-                <Flag data-icon="inline-start" /> {t.board.finish}
-              </Button>
+              <>
+                {concealed && (
+                  <Button variant="secondary" onClick={() => actions.revealCards()}>
+                    <Eye data-icon="inline-start" /> {t.board.reveal}
+                  </Button>
+                )}
+                <Button onClick={() => setConfirmFinish(true)}>
+                  <Flag data-icon="inline-start" /> {t.board.finish}
+                </Button>
+              </>
             )
           )}
         </div>
@@ -205,6 +236,13 @@ export default function BoardPage() {
           <Button size="sm" onClick={() => setReportOpen(true)}>
             <FileText data-icon="inline-start" /> {t.board.generateReport}
           </Button>
+        </div>
+      )}
+
+      {concealed && !locked && (
+        <div className="flex items-center gap-2 rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-muted-foreground">
+          <EyeOff className="size-4 shrink-0 text-primary" />
+          <span>{isHost ? t.board.hiddenHost : t.board.hiddenGuest}</span>
         </div>
       )}
 
@@ -231,6 +269,8 @@ export default function BoardPage() {
               me={participantId}
               isHost={isHost}
               locked={locked}
+              concealed={concealed}
+              revealFrom={revealing ? (revealStart[id] ?? 0) : null}
               actions={actions}
             />
           ))}
@@ -240,6 +280,8 @@ export default function BoardPage() {
             <RetroCard
               card={dragCard}
               accent={COLUMN_STYLES[dragCard.column].border}
+              me={participantId}
+              concealed={concealed}
               locked
               canDelete={false}
               overlay
@@ -273,6 +315,8 @@ export default function BoardPage() {
       </Dialog>
 
       <ReportDialog board={board} open={reportOpen} onOpenChange={setReportOpen} />
+
+      {revealing && <div aria-hidden className="reveal-flash pointer-events-none fixed inset-0 z-40" />}
     </div>
   )
 }

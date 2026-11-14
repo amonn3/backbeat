@@ -9,6 +9,9 @@
 - Close the card composer on outside clicks, keeping unsent drafts.
 - Allow cards and groups to move between columns while preserving same-column grouping.
 - Add isolated Socket.IO integration tests for permissions, playback, timer expiration and card movement.
+- Hide card content and authors from other participants until the host reveals them; authors still see
+  their own cards and the host sees everything. The reveal plays a flip-and-glow effect for everyone, and
+  ending the retro reveals any hidden cards so the report is complete.
 
 ## 0.2.0 — 2026-10-30
 
